@@ -1,4 +1,4 @@
-# xmake-project-template
+# kcache
 
-C/C++ 项目的 XMake 模板。
+分布式缓存。
 
