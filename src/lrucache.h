@@ -61,7 +61,7 @@ public:
     ByteViewOptional get(const std::string &key);
 
     // 插入或更新缓存。新写入的项会放在链表头部；如果更新已有 key，需要调整字节统计。写入后如果总占用超过 m_maxBytes，则从链表尾部淘汰最久未使用的项。
-    void set(const std::string &key, const ByteView &);
+    void set(const std::string &key, const ByteView &value);
 
     // 删除指定 key。删除时会同时清理哈希表和链表，并调用淘汰回调通知上层。
     void deleteByKey(const std::string &key);
