@@ -4,6 +4,9 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <functional>
+#include <list>
+#include <mutex>
 
 
 struct ByteView
@@ -31,6 +34,41 @@ struct Entry
     std::string m_key;
 
     ByteView m_value;
+};
+
+
+class LRUCache
+{
+
+    using EvictedFunc = std::function<void(std::string, ByteView)>;
+    using ListElementIter = std::list<Entry>::iterator;
+
+public:
+
+    LRUCache(int max_bytes, const EvictedFunc &evicted_func = nullptr) : m_maxBytes(max_bytes), m_evictedFunc(evicted_func) {}
+
+    ByteViewOptional Get(const std::string &key);
+
+    void Set(const std::string &key, const ByteView &);
+
+    void Delete(const std::string &key);
+
+    void RemoveOldest();
+
+
+private:
+
+    int64_t m_bytes = 0;
+
+    int64_t m_maxBytes;
+
+    EvictedFunc m_evictedFunc;
+
+    std::unordered_map<std::string, ListElementIter> m_cache;
+
+    std::list<Entry> m_list;
+
+    std::mutex m_mtx;
 };
 
 
