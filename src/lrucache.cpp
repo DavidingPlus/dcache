@@ -15,10 +15,10 @@ ByteViewOptional LRUCache::get(const std::string &key)
     if (m_cache.end() == m_cache.find(key)) return std::nullopt;
 
     // 找到缓存，并修改 m_cache 和 m_list。
-    ListElementIter &ele = m_cache[key];
-    auto [k, value] = *ele;
+    ListElementIter &elemIter = m_cache[key];
+    auto [k, value] = *elemIter;
 
-    m_list.erase(ele);
+    m_list.erase(elemIter);
     m_list.emplace_front(key, value);
 
     m_cache[key] = m_list.begin();
@@ -34,9 +34,9 @@ void LRUCache::set(const std::string &key, const ByteView &value)
     // 找到缓存，将其删除。
     if (m_cache.end() != m_cache.find(key))
     {
-        ListElementIter &ele = m_cache[key];
-        m_bytes += value.len() - ele->m_value.len();
-        m_list.erase(ele);
+        ListElementIter &elemIter = m_cache[key];
+        m_bytes += value.len() - elemIter->m_value.len();
+        m_list.erase(elemIter);
     }
     // 找不到缓存。
     else
@@ -54,8 +54,29 @@ void LRUCache::set(const std::string &key, const ByteView &value)
 
 void LRUCache::deleteByKey(const std::string &key)
 {
+    std::unique_lock<std::mutex> lock(m_mtx);
+
+    if (m_cache.end() == m_cache.find(key)) return;
+
+    ListElementIter &elemIter = m_cache[key];
+    auto [_, value] = *elemIter;
+
+    m_list.erase(elemIter);
+    m_cache.erase(key);
+    m_bytes -= key.size() + value.len();
+
+    if (m_evictedFunc) m_evictedFunc(key, value);
 }
 
 void LRUCache::removeOldest()
 {
+    if (m_list.empty()) return;
+
+    auto [key, value] = m_list.back();
+
+    m_list.pop_back();
+    m_cache.erase(key);
+    m_bytes -= key.size() + value.len();
+
+    if (m_evictedFunc) m_evictedFunc(key, value);
 }
