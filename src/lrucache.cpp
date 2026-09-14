@@ -8,19 +8,19 @@ ByteView ::ByteView(const std::string &str)
 }
 
 // TODO
-ByteViewOptional LRUCache::Get(const std::string &key)
+ByteViewOptional LRUCache::get(const std::string &key)
 {
     return {};
 }
 
-void LRUCache::Set(const std::string &key, const ByteView &)
+void LRUCache::set(const std::string &key, const ByteView &)
 {
 }
 
-void LRUCache::Delete(const std::string &key)
+void LRUCache::deleteByKey(const std::string &key)
 {
 }
 
-void LRUCache::RemoveOldest()
+void LRUCache::removeOldest()
 {
 }
