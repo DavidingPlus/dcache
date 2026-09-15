@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "consistenthash.h"
+#include "crc32.h"
 
 #include <cstdint>
 #include <string>
