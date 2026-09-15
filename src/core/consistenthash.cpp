@@ -2,6 +2,12 @@
 
 #include "crc32.h"
 
+#include <mutex>
+#include <algorithm>
+
+#include <fmt/format.h>
+#include <spdlog/spdlog.h>
+
 
 namespace kcache
 {
@@ -34,6 +40,24 @@ ConsistentHashMap::~ConsistentHashMap()
 
 bool ConsistentHashMap::add(const std::vector<std::string> &nodes)
 {
+    if (nodes.empty()) return false;
+
+    // 获取写锁。
+    std::unique_lock lock(m_mtx);
+
+    for (auto &node : nodes)
+    {
+        if (node.empty()) continue;
+
+        // 为每个真实节点添加虚拟节点。
+        addNode(node, m_config.m_defaultReplicas);
+    }
+
+    // 重新排序哈希环。
+    std::sort(m_keys.begin(), m_keys.end());
+
+
+    return true;
 }
 
 bool ConsistentHashMap::remove(const std::string &node)
@@ -50,6 +74,20 @@ std::unordered_map<std::string, double> ConsistentHashMap::getStats()
 
 void ConsistentHashMap::addNode(const std::string &node, int replicas)
 {
+    for (int i = 0; i < replicas; ++i)
+    {
+        std::string hashKey = fmt::format("{}-{}", node, std::to_string(i));
+        spdlog::debug("Adding virtual node: {} with hash key: {}", node, hashKey);
+
+        uint32_t hash = m_config.m_hashFunc(hashKey);
+        m_keys.push_back(hash);
+        m_hashMap[hash] = node;
+    }
+
+    m_nodeReplicas[node] = replicas;
+
+    // 如果节点是新添加的，初始化其计数器。
+    if (0 == m_nodeCounts.count(node)) m_nodeCounts[node] = 0;
 }
 
 void ConsistentHashMap::checkAndRebalance()
