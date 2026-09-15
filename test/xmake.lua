@@ -8,7 +8,8 @@ includes("config.lua")
 add_requires("gtest")
 
 local gtest_groups = {
-    "kcache",
+    "core",
+    "utils",
     "testrun"
 }
 

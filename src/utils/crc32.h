@@ -1,5 +1,5 @@
-#ifndef _CRC32_H_
-#define _CRC32_H_
+#ifndef _KCACHE_CRC32_H_
+#define _KCACHE_CRC32_H_
 
 #include <string>
 #include <cstdint>

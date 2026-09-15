@@ -2,6 +2,9 @@ includes("config.lua")
 
 
 local version = "0.0.0"
+local export_headers_module = "export-headers"
+local export_headers_import_options = {rootdir = os.scriptdir(), anonymous = true}
+
 
 set_version(version)
 
@@ -69,8 +72,8 @@ target("kcache")
 
     -- 会将 src 根目录和所有子目录一起匹配。
     add_files("src/**.cpp")
-    add_public_headers()
-    add_includedirs("src", {public = true})
+
+    add_includedirs("src", os.dirs("src/**"), {public = true})
 
     before_build(function (target)
         io.writefile(path.join(path.directory(target:targetdir()), ".version"), version)
@@ -81,7 +84,9 @@ target("kcache")
         os.mkdir(target:installdir())
 
         os.cp("$(builddir)/$(plat)/$(arch)/$(mode)/.version", target:installdir())
-        os.cp("$(builddir)/config/config.h", path.join(target:installdir(), "config/config.h"))
+
+        local export_headers = import(export_headers_module, export_headers_import_options)
+        export_headers.install_export_public_headers(target, target:installdir())
     end)
 
     before_package(function (target)
@@ -90,7 +95,9 @@ target("kcache")
 
         os.cp("$(builddir)/$(plat)/$(arch)/$(mode)/.version", target:packagedir())
         os.cp("$(builddir)/$(plat)/$(arch)/$(mode)/.version", path.join(target:packagedir(), "$(plat)/$(arch)/$(mode)/.version"))
-        os.cp("$(builddir)/config/config.h", path.join(target:packagedir(), "$(plat)/$(arch)/$(mode)/config/config.h"))
+
+        local export_headers = import(export_headers_module, export_headers_import_options)
+        export_headers.package_export_public_headers(target)
     end)
 target_end()
 

@@ -1,5 +1,5 @@
-#ifndef _CONSISTENT_HASH_H_
-#define _CONSISTENT_HASH_H_
+#ifndef _KCACHE_CONSISTENT_HASH_H_
+#define _KCACHE_CONSISTENT_HASH_H_
 
 #include <cstdint>
 #include <functional>
