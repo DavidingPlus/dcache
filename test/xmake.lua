@@ -10,7 +10,8 @@ add_requires("gtest")
 local gtest_groups = {
     "core",
     "utils",
-    "testrun"
+    "testrun",
+    "third_party"
 }
 
 -- 请用 xmake test 执行测试。
@@ -20,7 +21,7 @@ target("tests")
     set_kind("binary")
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/test")
     add_deps("kcache")
-    add_packages("gtest")
+    add_packages("fmt", "gtest", "spdlog")
 
     before_build(function ()
         os.tryrm("$(builddir)/$(plat)/$(arch)/$(mode)/test/gtest")
