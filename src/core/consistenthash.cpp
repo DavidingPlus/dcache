@@ -19,11 +19,17 @@ namespace kcache
 
 
 ConsistentHashMap::ConsistentHashMap(HashConfig cfg)
+    : m_config(cfg), m_totalRequests(0), m_isBalancerStop(false)
 {
+    // 启动负载均衡器。
+    startBalancer();
 }
 
 ConsistentHashMap::~ConsistentHashMap()
 {
+    m_isBalancerStop = true;
+    // 等待负载均衡器线程完成。
+    if (m_balancerThread.joinable()) m_balancerThread.join();
 }
 
 bool ConsistentHashMap::add(const std::vector<std::string> &nodes)
@@ -56,4 +62,18 @@ void ConsistentHashMap::rebalanceNodes()
 
 void ConsistentHashMap::startBalancer()
 {
+    m_isBalancerStop = false;
+
+    m_balancerThread = std::thread(
+        [this]()
+        {
+            while (!m_isBalancerStop)
+            {
+                // 每秒检查一次。
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+
+                // 再次检查，防止在 sleep 期间被要求停止。
+                if (!m_isBalancerStop) checkAndRebalance();
+            } //
+        });
 }
