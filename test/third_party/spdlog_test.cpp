@@ -2,6 +2,7 @@
 
 #include <spdlog/logger.h>
 #include <spdlog/sinks/ostream_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <memory>
@@ -98,4 +99,22 @@ TEST(SpdlogTests, SupportsTheDefaultLoggerApi)
     EXPECT_EQ("[unit-test] [info] message through the default logger\n", testLogger.output.str());
 
     spdlog::set_default_logger(previousLogger);
+}
+
+TEST(SpdlogTests, PrintsExampleLogsToTerminal)
+{
+    const std::string loggerName = "spdlog-terminal-demo";
+    spdlog::drop(loggerName);
+
+    const auto logger = spdlog::stdout_color_mt(loggerName);
+    logger->set_level(spdlog::level::trace);
+    logger->set_pattern("[%n] [%^%l%$] %v");
+
+    logger->info("info: cache connected, key={}", "user:1");
+    logger->warn("warning: cache usage is {}%", 80);
+    logger->error("error: key={} was not found", "missing");
+    logger->flush();
+
+    EXPECT_EQ(spdlog::level::trace, logger->level());
+    spdlog::drop(loggerName);
 }
