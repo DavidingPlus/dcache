@@ -16,3 +16,44 @@ namespace kcache
     };
 
 } // namespace kcache
+
+
+ConsistentHashMap::ConsistentHashMap(HashConfig cfg)
+{
+}
+
+ConsistentHashMap::~ConsistentHashMap()
+{
+}
+
+bool ConsistentHashMap::add(const std::vector<std::string> &nodes)
+{
+}
+
+bool ConsistentHashMap::remove(const std::string &node)
+{
+}
+
+std::string ConsistentHashMap::get(const std::string &key)
+{
+}
+
+std::unordered_map<std::string, double> ConsistentHashMap::getStats()
+{
+}
+
+void ConsistentHashMap::addNode(const std::string &node, int replicas)
+{
+}
+
+void ConsistentHashMap::checkAndRebalance()
+{
+}
+
+void ConsistentHashMap::rebalanceNodes()
+{
+}
+
+void ConsistentHashMap::startBalancer()
+{
+}

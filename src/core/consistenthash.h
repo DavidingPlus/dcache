@@ -4,6 +4,11 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
+#include <thread>
+#include <atomic>
+#include <shared_mutex>
+#include <unordered_map>
 
 
 // 一致性哈希配置。
@@ -37,6 +42,75 @@ namespace kcache
     extern const HashConfig kDefaultHashConfig;
 
 } // namespace kcache
+
+
+// Map 一致性哈希实现。
+class ConsistentHashMap
+{
+
+public:
+
+    // New 创建一致性哈希实例。
+    explicit ConsistentHashMap(HashConfig cfg = kcache::kDefaultHashConfig);
+
+    // 析构函数，确保负载均衡器线程正确停止。
+    ~ConsistentHashMap();
+
+    // add 添加节点。返回 true 表示成功，false 表示失败。
+    bool add(const std::vector<std::string> &nodes);
+
+    // remove 移除节点。返回 true 表示成功，false 表示失败。
+    bool remove(const std::string &node);
+
+    // get 获取节点。
+    std::string get(const std::string &key);
+
+    // getStats 获取负载统计信息。
+    std::unordered_map<std::string, double> getStats();
+
+
+private:
+
+    // addNode 添加节点的虚拟节点。
+    void addNode(const std::string &node, int replicas);
+
+    // checkAndRebalance 检查并重新平衡虚拟节点。
+    void checkAndRebalance();
+
+    // rebalanceNodes 重新平衡节点。
+    void rebalanceNodes();
+
+    // startBalancer 启动负载均衡器线程。
+    void startBalancer();
+
+
+    // 读写互斥量。
+    mutable std::shared_mutex m_mtx;
+
+    // 配置信息。
+    HashConfig m_config;
+
+    // 哈希环。
+    std::vector<uint32_t> m_keys;
+
+    // 哈希环到节点的映射。
+    std::unordered_map<uint32_t, std::string> m_hashMap;
+
+    // 节点到虚拟节点数量的映射。
+    std::unordered_map<std::string, int> m_nodeReplicas;
+
+    // 节点负载统计。使用 std::atomic<long long> 保证对 m_nodeCounts 中每个节点计数的原子操作。
+    std::unordered_map<std::string, std::atomic<long long>> m_nodeCounts;
+
+    // 总请求数。
+    std::atomic<long long> m_totalRequests;
+
+    // 负载均衡器线程。
+    std::thread m_balancerThread;
+
+    // 控制负载均衡器线程停止的标志。
+    std::atomic<bool> m_isBalancerStop;
+};
 
 
 #endif
