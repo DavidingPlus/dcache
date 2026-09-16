@@ -1,6 +1,13 @@
 #ifndef _KCACHE_SINGLEFLIGHT_H_
 #define _KCACHE_SINGLEFLIGHT_H_
 
+#include <future>
+#include <optional>
+#include <unordered_map>
+#include <memory>
+
+#include "lrucache.h"
+
 
 // 缓存三大问题：击穿、雪崩、穿透。
 // 1. 缓存击穿：某个热点 key 在缓存过期瞬间，同时有大量请求访问这个 key，导致所有请求都落到数据库上，造成数据库瞬时压力过大。
@@ -12,6 +19,28 @@
 // 这个项目中使用 SingleFlight 合并并发请求，只允许一个请求访问数据源，防止缓存击穿。
 class SingleFlight
 {
+
+    using Result = std::optional<ByteView>;
+
+    using Func = std::function<Result()>;
+
+public:
+
+    Result Do(const std::string &key, Func func);
+
+
+private:
+
+    struct Call
+    {
+        std::promise<Result> m_prom;
+
+        std::shared_future<Result> m_fut = m_prom.get_future().share();
+    };
+
+    std::mutex m_mtx;
+
+    std::unordered_map<std::string, std::shared_ptr<Call>> m_map;
 };
 
 
