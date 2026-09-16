@@ -49,6 +49,9 @@ bool ConsistentHashMap::add(const std::vector<std::string> &nodes)
     {
         if (node.empty()) continue;
 
+        // 不允许重复添加结点。
+        if (m_nodeReplicas.end() != m_nodeReplicas.find(node)) continue;
+
         // 为每个真实节点添加虚拟节点。
         addNode(node, m_config.m_defaultReplicas);
     }
@@ -110,7 +113,9 @@ std::string ConsistentHashMap::get(const std::string &key)
     // 处理边界情况（模拟环）：如果到了末尾，则回到开头。
     if (m_keys.end() == it) it = m_keys.begin();
 
-    // 增加节点计数和总请求数，这里使用原子操作。
+    // m_mtx 的读锁保护哈希环以及节点映射的容器结构；多个 get() 可以同时持有读锁。
+    // m_nodeCounts 和 m_totalRequests 是原子变量，递增操作只修改原子变量的值，共享锁限制的是容器结构的修改，不限制原子变量值的原子更新，因此可以安全地在读锁中并发执行。这里不需要将读锁升级为写锁；只有增删容器元素等结构性修改才需要写锁。
+    // 这里依赖 m_keys、m_hashMap 和 m_nodeCounts 始终保持同步，保证下标访问命中已有元素。
     std::string node = m_hashMap[*it];
     ++m_nodeCounts[node];
     ++m_totalRequests;
@@ -126,7 +131,7 @@ std::unordered_map<std::string, double> ConsistentHashMap::getStats() const
 
     std::unordered_map<std::string, double> stats;
     long long currTotal = m_totalRequests.load();
-    if (currTotal == 0) return stats;
+    if (0 == currTotal) return stats;
 
     for (auto &[node, count] : m_nodeCounts) stats[node] = static_cast<double>(count.load()) / static_cast<double>(currTotal);
 
@@ -261,13 +266,20 @@ void ConsistentHashMap::rebalanceNodes()
             loadRatio = 1.0;
         }
 
+        // 为什么负载过高就减少虚拟节点数?
+        // 一致性哈希通过在哈希环上为每个物理节点创建多个虚拟节点，使请求更均匀地分布。虚拟节点数越多，节点在哈希环上的 "占位" 越多，分配到的请求也越多。
+        // 而虚拟节点数减少后，该节点在哈希环上的 "覆盖范围" 变小，请求命中该节点的概率降低。且我们使用一致性哈希希望让请求均匀分布到各节点，若某个节点负载过高，说明其虚拟节点数过多，需要减少。
+
         // 负载过高（loadRatio > 1.0）：减少虚拟节点数，公式为 旧虚拟节点数 / loadRatio。
         // 负载过低（loadRatio ≤ 1.0）：增加虚拟节点数，公式为 旧虚拟节点数 × (2.0 - loadRatio)。
-        int newReplicas = static_cast<int>(std::round(static_cast<double>(oldReplicas) / (loadRatio > 1.0 ? loadRatio : 2.0 - loadRatio)));
+        int newReplicas = static_cast<int>(std::round(
+            loadRatio > 1.0
+                ? static_cast<double>(oldReplicas) / loadRatio
+                : static_cast<double>(oldReplicas) * (2.0 - loadRatio)));
 
         // 确保在 newReplicas 限制范围内。
         if (newReplicas < m_config.m_minReplicas) newReplicas = m_config.m_minReplicas;
-        if (newReplicas > m_config.m_maxReplicas) newReplicas = m_config.m_minReplicas;
+        if (newReplicas > m_config.m_maxReplicas) newReplicas = m_config.m_maxReplicas;
 
         // 虚拟节点重建。重新添加节点的虚拟节点：先移除旧的，再添加新的。
         if (newReplicas != oldReplicas)
@@ -277,7 +289,7 @@ void ConsistentHashMap::rebalanceNodes()
             for (int i = 0; i < replicasToRemove; ++i)
             {
                 std::string hashKey = node + "-" + std::to_string(i);
-                int hash = static_cast<int>(m_config.m_hashFunc(hashKey));
+                uint32_t hash = static_cast<uint32_t>(m_config.m_hashFunc(hashKey));
 
                 m_hashMap.erase(hash);
 
