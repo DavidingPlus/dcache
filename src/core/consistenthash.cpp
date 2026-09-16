@@ -189,10 +189,12 @@ void ConsistentHashMap::checkAndRebalance()
         {
             if (diff / avgLoad > maxDiff) maxDiff = diff / avgLoad;
         }
-        // 平均负载为 0 时，所有节点各自计数也应该都是 0。但由于统计数据暂时不一致，并发更新，计数器重置时机不同，节点增删过程中的中间状态等问题，可能导致当前节点仍有请求计数，此时统计状态不一致，按最大不均衡处理。
+        // 平均负载为 0 时，所有节点各自计数也应该都是 0。但由于统计数据暂时不一致，并发更新，计数器重置时机不同，节点增删过程中的中间状态等问题，可能导致某个节点请求计数大于 0，此时统计状态不一致，按最大不均衡处理。
         else if (0 == avgLoad && diff > 0)
         {
-            // 最大不均衡状态。
+            // 将 maxDiff 设为 1.0 的原因为：
+            // 1. 表示最大不均衡状态。maxDiff 本质上是负载差异的相对比例。当 avgLoad = 0 但节点有请求时，说明这本身就是一种非常不平衡的状态。将 maxDiff 设为 1.0（即 100%），表示 "负载分配达到了最不均衡的状态"，需要强制触发重平衡。
+            // 2. 确保重平衡被触发。在代码中，当 maxDiff > m_config.m_loadBalanceThreshold 时触发重平衡。若 maxDiff 不设为 1.0，可能导致 maxDiff 始终为 0，无法触发重平衡。
             maxDiff = 1.0;
         }
     }
@@ -206,6 +208,96 @@ void ConsistentHashMap::checkAndRebalance()
 
 void ConsistentHashMap::rebalanceNodes()
 {
+    // 节点再平衡。
+    // 1. 获取写锁：
+    // 由于需要修改哈希环结构，使用写锁确保线程安全。
+    // 2. 计算负载比例：
+    // 对每个节点，计算其负载比例 loadRatio = 节点请求数 / 平均负载。
+    // 若 avgLoad 为 0 但节点有请求，将 loadRatio 设为 2.0（触发虚拟节点减少）。
+    // 3. 调整虚拟节点数量：
+    // 负载过高（loadRatio > 1.0）：减少虚拟节点数，公式为 旧虚拟节点数 / loadRatio。
+    // 负载过低（loadRatio ≤ 1.0）：增加虚拟节点数，公式为 旧虚拟节点数 × (2.0 - loadRatio)。
+    // 确保虚拟节点数在配置的 m_minReplicas 和 m_maxReplicas 范围内。
+    // 4. 更新哈希环：
+    // 移除旧的虚拟节点：从哈希环（hash_map_ 和 m_keys）中删除节点的所有虚拟节点。
+    // 添加新的虚拟节点：调用 AddNode() 重新添加调整后的虚拟节点。
+    // 5. 重置计数器：
+    // 清空所有节点的请求计数和总请求数，为下一轮负载均衡做准备。
+    // 重新排序哈希环：
+    // 对 m_keys 排序，确保哈希环按哈希值有序排列，便于后续查找。
+
+    // 获取写锁。
+    std::unique_lock lock(m_mtx);
+
+    if (m_nodeReplicas.empty()) return;
+
+    long long currentTotalRequests = m_totalRequests.load();
+    double avgLoad = static_cast<double>(currentTotalRequests) / m_nodeReplicas.size();
+
+    // 调整每个节点的虚拟节点数量。
+    // 注意：这里需要创建一个副本，因为在循环中可能会修改 m_nodeReplicas 和 m_nodeCounts。
+    std::unordered_map<std::string, int> currReplicas = m_nodeReplicas;
+    std::unordered_map<std::string, long long> currCounts;
+    for (auto &[node, count] : m_nodeCounts) currCounts[node] = count.load();
+
+    for (auto &[node, count] : currCounts)
+    {
+        int oldReplicas = currReplicas[node];
+
+        double loadRatio = 0.0;
+        // 正常计算负载比例。
+        if (avgLoad > 0)
+        {
+            loadRatio = static_cast<double>(count) / avgLoad;
+        }
+        // avgLoad 为 0 但节点有请求，按照最高负载处理。
+        else if (0 == avgLoad && count > 0)
+        {
+            loadRatio = 2.0;
+        }
+        // avgLoad 为 0 且节点无请求，无需调整。
+        else
+        {
+            loadRatio = 1.0;
+        }
+
+        // 负载过高（loadRatio > 1.0）：减少虚拟节点数，公式为 旧虚拟节点数 / loadRatio。
+        // 负载过低（loadRatio ≤ 1.0）：增加虚拟节点数，公式为 旧虚拟节点数 × (2.0 - loadRatio)。
+        int newReplicas = static_cast<int>(std::round(static_cast<double>(oldReplicas) / (loadRatio > 1.0 ? loadRatio : 2.0 - loadRatio)));
+
+        // 确保在 newReplicas 限制范围内。
+        if (newReplicas < m_config.m_minReplicas) newReplicas = m_config.m_minReplicas;
+        if (newReplicas > m_config.m_maxReplicas) newReplicas = m_config.m_minReplicas;
+
+        // 虚拟节点重建。重新添加节点的虚拟节点：先移除旧的，再添加新的。
+        if (newReplicas != oldReplicas)
+        {
+            // 移除节点的所有虚拟节点。
+            int replicasToRemove = m_nodeReplicas[node];
+            for (int i = 0; i < replicasToRemove; ++i)
+            {
+                std::string hashKey = node + "-" + std::to_string(i);
+                int hash = static_cast<int>(m_config.m_hashFunc(hashKey));
+
+                m_hashMap.erase(hash);
+
+                auto it = std::remove(m_keys.begin(), m_keys.end(), hash);
+                m_keys.erase(it, m_keys.end());
+            }
+
+            m_nodeReplicas.erase(node);
+
+            // 添加新的虚拟节点。
+            addNode(node, newReplicas);
+        }
+    }
+
+    // 重置计数器。
+    for (auto &pair : m_nodeCounts) pair.second.store(0);
+    m_totalRequests.store(0);
+
+    // 重新排序哈希环。
+    std::sort(m_keys.begin(), m_keys.end());
 }
 
 void ConsistentHashMap::startBalancer()
