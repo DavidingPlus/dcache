@@ -1,4 +1,4 @@
-# C++ `promise`、`future` 与 `shared_future` 学习笔记
+# `promise`、`future` 与 `shared_future` 学习笔记
 
 这三个类型用于在线程之间传递“某个未来才会产生的结果”。它们本身不是线程，而是一套线程同步和结果传递机制。
 
