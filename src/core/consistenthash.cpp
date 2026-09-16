@@ -156,6 +156,52 @@ void ConsistentHashMap::addNode(const std::string &node, int replicas)
 
 void ConsistentHashMap::checkAndRebalance()
 {
+    // 负载不均衡检测。
+    // 1. 触发条件检查：
+    // 当总请求数少于 1000 时，认为样本量不足，不进行负载均衡调整。
+    // 通过读锁安全访问节点信息（m_nodeReplicas 和 m_nodeCounts）。
+    // 2. 计算负载均衡度：
+    // 计算平均负载：avgLoad = 总请求数 / 节点数。
+    // 遍历所有节点，计算每个节点的负载与平均负载的差异百分比（diff / avgLoad）。
+    // 记录最大差异百分比 maxDiff，作为负载不均衡度的指标。
+    // 3. 触发重平衡：
+    // 当 maxDiff 超过配置的阈值（m_config.m_loadBalanceThreshold）时，调用 RebalanceNodes() 进行重平衡。
+
+    // 样本太少，不进行调整。
+    if (m_totalRequests.load() < 1000) return;
+
+    // 获取读锁。
+    std::shared_lock lock(m_mtx);
+
+    if (m_nodeReplicas.empty()) return;
+
+    // 计算系统平均负载：总请求数 / 物理节点数量。
+    long long currentTotalRequests = m_totalRequests.load();
+    double avgLoad = static_cast<double>(currentTotalRequests) / m_nodeReplicas.size();
+    double maxDiff = 0.0;
+
+    // 遍历所有节点计算负载偏差，计算每个节点的负载与平均负载的差异百分比。
+    for (auto &[node, count] : m_nodeCounts)
+    {
+        double diff = std::abs(static_cast<double>(count.load()) - avgLoad);
+        // 避免除以零。
+        if (avgLoad > 0)
+        {
+            if (diff / avgLoad > maxDiff) maxDiff = diff / avgLoad;
+        }
+        // 平均负载为 0 时，所有节点各自计数也应该都是 0。但由于统计数据暂时不一致，并发更新，计数器重置时机不同，节点增删过程中的中间状态等问题，可能导致当前节点仍有请求计数，此时统计状态不一致，按最大不均衡处理。
+        else if (0 == avgLoad && diff > 0)
+        {
+            // 最大不均衡状态。
+            maxDiff = 1.0;
+        }
+    }
+
+    // 释放读锁，因为 rebalanceNodes 需要写锁。
+    lock.unlock();
+
+    // 如果负载不均衡度超过阈值，调整虚拟节点。
+    if (maxDiff > m_config.m_loadBalanceThreshold) rebalanceNodes();
 }
 
 void ConsistentHashMap::rebalanceNodes()
