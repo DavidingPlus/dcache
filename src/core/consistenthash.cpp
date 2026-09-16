@@ -97,6 +97,26 @@ bool ConsistentHashMap::remove(const std::string &node)
 
 std::string ConsistentHashMap::get(const std::string &key)
 {
+    if (key.empty()) return "";
+
+    // 获取读锁。
+    std::shared_lock lock(m_mtx);
+
+    if (m_keys.empty()) return "";
+
+    uint32_t hash = m_config.m_hashFunc(key);
+    // 二分查找：找到第一个大于等于 hash 的位置。
+    auto it = std::lower_bound(m_keys.begin(), m_keys.end(), hash);
+    // 处理边界情况（模拟环）：如果到了末尾，则回到开头。
+    if (m_keys.end() == it) it = m_keys.begin();
+
+    // 增加节点计数和总请求数，这里使用原子操作。
+    std::string node = m_hashMap[*it];
+    ++m_nodeCounts[node];
+    ++m_totalRequests;
+
+
+    return node;
 }
 
 std::unordered_map<std::string, double> ConsistentHashMap::getStats()

@@ -44,7 +44,9 @@ namespace kcache
 } // namespace kcache
 
 
-// Map 一致性哈希实现。
+// 一致性哈希路由表。
+// ConsistentHashMap 只负责将 key 映射到它应该去的真实节点，内部维护的是哈希环、虚拟节点和节点负载信息。它不保存缓存数据，也不判断某个 key 是否已经存在，比如 get() 返回的是节点名称，而不是缓存 value。
+// LRUCache 等缓存组件负责实际的数据存取、命中判断和淘汰；上层通常先通过 ConsistentHashMap 选择节点，再访问该节点上的缓存。缓存未命中时，上层负责回源并将结果写回同一个路由节点。
 class ConsistentHashMap
 {
 
@@ -62,7 +64,8 @@ public:
     // remove 移除节点。返回 true 表示成功，false 表示失败。
     bool remove(const std::string &node);
 
-    // get 获取节点。
+    // get 获取节点。根据一个 key，找到应该负责这个 key 的真实节点。
+    // 注意：一致性哈希的 get() 语义只负责路由，不检查 key 是否已经存在于缓存中。key 是否命中由目标缓存节点负责判断。即使 key 尚未写入缓存，也可以根据当前哈希环确定如果它在缓存中，应该落在哪个虚拟节点以及哪个真实节点。缓存未命中时，上层通常向数据源回源，并将结果写回该负责节点。
     std::string get(const std::string &key);
 
     // getStats 获取负载统计信息。
