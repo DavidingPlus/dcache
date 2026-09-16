@@ -68,8 +68,8 @@ public:
     // 注意：一致性哈希的 get() 语义只负责路由，不检查 key 是否已经存在于缓存中。key 是否命中由目标缓存节点负责判断。即使 key 尚未写入缓存，也可以根据当前哈希环确定如果它在缓存中，应该落在哪个虚拟节点以及哪个真实节点。缓存未命中时，上层通常向数据源回源，并将结果写回该负责节点。
     std::string get(const std::string &key);
 
-    // getStats 获取负载统计信息。
-    std::unordered_map<std::string, double> getStats();
+    // getStats 获取负载统计信息。统计各真实节点承接的请求占比。
+    std::unordered_map<std::string, double> getStats() const;
 
 
 private:

@@ -119,8 +119,19 @@ std::string ConsistentHashMap::get(const std::string &key)
     return node;
 }
 
-std::unordered_map<std::string, double> ConsistentHashMap::getStats()
+std::unordered_map<std::string, double> ConsistentHashMap::getStats() const
 {
+    // 获取读锁。
+    std::shared_lock lock(m_mtx);
+
+    std::unordered_map<std::string, double> stats;
+    long long currTotal = m_totalRequests.load();
+    if (currTotal == 0) return stats;
+
+    for (auto &[node, count] : m_nodeCounts) stats[node] = static_cast<double>(count.load()) / static_cast<double>(currTotal);
+
+
+    return stats;
 }
 
 void ConsistentHashMap::addNode(const std::string &node, int replicas)
