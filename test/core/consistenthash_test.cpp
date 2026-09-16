@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <unordered_set>
 
 
 namespace
@@ -275,4 +276,392 @@ TEST(ConsistentHashMapTests, SupportsConcurrentAtomicRequestCounting)
     ASSERT_EQ(2u, stats.size());
     EXPECT_NEAR(0.5, stats.at("node-a"), 1e-9);
     EXPECT_NEAR(0.5, stats.at("node-b"), 1e-9);
+}
+
+
+/*
+    摘抄自 https://github.com/youngyangyang04/KamaCache-CPP/blob/main/test/test_consistent_hash.cpp
+*/
+
+class ConsistentHashTest : public ::testing::Test
+{
+
+protected:
+
+    void SetUp() override
+    {
+        // Simple hash function for predictable testing
+        m_testConfig = HashConfig{
+            3,  // replicas
+            1,  // min_replicas
+            10, // max_replicas
+            std::hash<std::string>{},
+            0.2 // load_balance_threshold
+        };
+    }
+
+
+    HashConfig m_testConfig;
+};
+
+TEST_F(ConsistentHashTest, DefaultConstructor)
+{
+    ConsistentHashMap hashMap;
+
+    // Should work with default configuration
+    EXPECT_TRUE(hashMap.add({"node1", "node2"}));
+
+    auto node = hashMap.get("test_key");
+    EXPECT_TRUE(node == "node1" || node == "node2");
+}
+
+TEST_F(ConsistentHashTest, CustomConfigConstructor)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    EXPECT_TRUE(hashMap.add({"node1"}));
+    auto node = hashMap.get("test_key");
+    EXPECT_EQ(node, "node1");
+}
+
+TEST_F(ConsistentHashTest, BasicAddAndGet)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    // Add nodes
+    EXPECT_TRUE(hashMap.add({"node1", "node2", "node3"}));
+
+    // Test that Get returns one of the added nodes
+    std::unordered_set<std::string> expectedNodes = {"node1", "node2", "node3"};
+
+    for (int i = 0; i < 100; ++i)
+    {
+        std::string key = "key" + std::to_string(i);
+        auto node = hashMap.get(key);
+        EXPECT_TRUE(expectedNodes.count(node) > 0);
+    }
+}
+
+TEST_F(ConsistentHashTest, ConsistentHashing)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    // Add initial nodes
+    EXPECT_TRUE(hashMap.add({"node1", "node2"}));
+
+    // Record which node each key maps to
+    std::unordered_map<std::string, std::string> keyToNode;
+    std::vector<std::string> testKeys;
+
+    for (int i = 0; i < 50; ++i)
+    {
+        std::string key = "key" + std::to_string(i);
+        testKeys.push_back(key);
+        keyToNode[key] = hashMap.get(key);
+    }
+
+    // Add another node
+    EXPECT_TRUE(hashMap.add({"node3"}));
+
+    // Check that most keys still map to the same nodes
+    int unchangedKeys = 0;
+    for (const auto &key : testKeys)
+    {
+        if (hashMap.get(key) == keyToNode[key])
+        {
+            unchangedKeys++;
+        }
+    }
+
+    // With consistent hashing, most keys should remain unchanged
+    EXPECT_GT(unchangedKeys, testKeys.size() * 0.6); // At least 60% should be unchanged
+}
+
+TEST_F(ConsistentHashTest, RemoveNode)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    // Add nodes
+    EXPECT_TRUE(hashMap.add({"node1", "node2", "node3"}));
+
+    // Remove a node
+    EXPECT_TRUE(hashMap.remove("node2"));
+
+    // Verify node2 is no longer returned
+    std::unordered_set<std::string> possibleNodes;
+    for (int i = 0; i < 100; ++i)
+    {
+        std::string key = "key" + std::to_string(i);
+        auto node = hashMap.get(key);
+        possibleNodes.insert(node);
+    }
+
+    EXPECT_EQ(possibleNodes.count("node2"), 0);
+    EXPECT_GT(possibleNodes.count("node1"), 0);
+    EXPECT_GT(possibleNodes.count("node3"), 0);
+}
+
+TEST_F(ConsistentHashTest, RemoveNonExistentNode)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    EXPECT_TRUE(hashMap.add({"node1"}));
+
+    // Removing non-existent node should handle gracefully
+    bool result = hashMap.remove("nonexistent");
+    // The behavior may vary based on implementation
+    // Just ensure it doesn't crash
+
+    // Original node should still work
+    auto node = hashMap.get("test_key");
+    EXPECT_EQ(node, "node1");
+}
+
+TEST_F(ConsistentHashTest, EmptyHashMap)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    // Getting from empty hash map should return empty string or handle gracefully
+    auto node = hashMap.get("test_key");
+    // Implementation may return empty string or throw
+    // Just ensure it doesn't crash
+}
+
+TEST_F(ConsistentHashTest, LoadBalanceDistribution)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    // Add nodes
+    EXPECT_TRUE(hashMap.add({"node1", "node2", "node3"}));
+
+    // Generate many requests to test load distribution
+    std::unordered_map<std::string, int> nodeCounts;
+    int totalRequests = 10000;
+
+    for (int i = 0; i < totalRequests; ++i)
+    {
+        std::string key = "key" + std::to_string(i);
+        auto node = hashMap.get(key);
+        nodeCounts[node]++;
+    }
+
+    // Check that load is reasonably distributed
+    EXPECT_EQ(nodeCounts.size(), 3);
+
+    for (const auto &[node, count] : nodeCounts)
+    {
+        double loadRatio = static_cast<double>(count) / totalRequests;
+        // Each node should get roughly 1/3 of the load, allow some variance
+        EXPECT_GT(loadRatio, 0.2);
+        EXPECT_LT(loadRatio, 0.5);
+    }
+}
+
+TEST_F(ConsistentHashTest, GetStats)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    EXPECT_TRUE(hashMap.add({"node1", "node2"}));
+
+    // Make some requests
+    for (int i = 0; i < 100; ++i)
+    {
+        hashMap.get("key" + std::to_string(i));
+    }
+
+    // Get statistics
+    auto stats = hashMap.getStats();
+
+    // Should have stats for both nodes
+    EXPECT_TRUE(stats.count("node1") > 0 || stats.count("node2") > 0);
+
+    // Stats should be reasonable (between 0 and 1)
+    for (const auto &[node, ratio] : stats)
+    {
+        EXPECT_GE(ratio, 0.0);
+        EXPECT_LE(ratio, 1.0);
+    }
+}
+
+TEST_F(ConsistentHashTest, ThreadSafety)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    EXPECT_TRUE(hashMap.add({"node1", "node2", "node3"}));
+
+    std::atomic<int> successfulGets{0};
+    std::atomic<bool> stopFlag{false};
+
+    // Start multiple reader threads
+    std::vector<std::thread> readers;
+    for (int i = 0; i < 4; ++i)
+    {
+        readers.emplace_back([&hashMap, &successfulGets, &stopFlag, i]()
+                             {
+            while (!stopFlag.load()) {
+                std::string key = "thread" + std::to_string(i) + "_key" + std::to_string(successfulGets.load());
+                auto node = hashMap.get(key);
+                if (!node.empty()) {
+                    successfulGets++;
+                }
+                std::this_thread::sleep_for(std::chrono::microseconds(10));
+            } });
+    }
+
+    // Start a writer thread
+    std::thread writer([&hashMap, &stopFlag]()
+                       {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        hashMap.add({"node4"});
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        hashMap.remove("node4");
+        stopFlag.store(true); });
+
+    writer.join();
+    for (auto &reader : readers)
+    {
+        reader.join();
+    }
+
+    EXPECT_GT(successfulGets.load(), 0);
+}
+
+TEST_F(ConsistentHashTest, MultipleAddOperations)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    // Add nodes in multiple batches
+    EXPECT_TRUE(hashMap.add({"node1"}));
+    EXPECT_TRUE(hashMap.add({"node2", "node3"}));
+    EXPECT_TRUE(hashMap.add({"node4"}));
+
+    // Verify all nodes are accessible
+    std::unordered_set<std::string> foundNodes;
+    for (int i = 0; i < 1000; ++i)
+    {
+        std::string key = "key" + std::to_string(i);
+        auto node = hashMap.get(key);
+        foundNodes.insert(node);
+    }
+
+    EXPECT_EQ(foundNodes.size(), 4);
+    EXPECT_TRUE(foundNodes.count("node1") > 0);
+    EXPECT_TRUE(foundNodes.count("node2") > 0);
+    EXPECT_TRUE(foundNodes.count("node3") > 0);
+    EXPECT_TRUE(foundNodes.count("node4") > 0);
+}
+
+TEST_F(ConsistentHashTest, DuplicateNodeAddition)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    EXPECT_TRUE(hashMap.add({"node1", "node2"}));
+
+    // Try to add duplicate nodes
+    bool result = hashMap.add({"node1", "node3"});
+    // Implementation may handle duplicates differently
+    // Just ensure it doesn't crash
+
+    auto node = hashMap.get("test_key");
+    EXPECT_FALSE(node.empty());
+}
+
+TEST_F(ConsistentHashTest, SpecificHashBehavior)
+{
+    // Test with a simple, predictable hash function
+    HashConfig simpleConfig = m_testConfig;
+    simpleConfig.m_defaultReplicas = 1; // Use fewer replicas for predictable testing
+    simpleConfig.m_hashFunc = [](const std::string &key) -> uint32_t
+    {
+        if (key == "2") return 2;
+        if (key == "4") return 4;
+        if (key == "6") return 6;
+        if (key == "8") return 8;
+        if (key == "11") return 11;
+        if (key == "23") return 23;
+        if (key == "27") return 27;
+        // For node names, create virtual nodes
+        if (key == "2_0") return 2;
+        if (key == "4_0") return 4;
+        if (key == "6_0") return 6;
+        if (key == "8_0") return 8;
+        return std::hash<std::string>{}(key);
+    };
+
+    ConsistentHashMap hashMap(simpleConfig);
+
+    // This test is based on the example, but may need adjustment
+    // depending on the exact virtual node generation algorithm
+    EXPECT_TRUE(hashMap.add({"6", "4", "2"}));
+
+    // Test some key mappings
+    auto node = hashMap.get("2");
+    EXPECT_FALSE(node.empty());
+
+    node = hashMap.get("11");
+    EXPECT_FALSE(node.empty());
+}
+
+TEST_F(ConsistentHashTest, ConfigValidation)
+{
+    // Test with extreme configurations
+    HashConfig extremeConfig = m_testConfig;
+    extremeConfig.m_defaultReplicas = 1000; // Very high replicas
+    extremeConfig.m_minReplicas = 500;
+    extremeConfig.m_maxReplicas = 2000;
+
+    ConsistentHashMap hashMap(extremeConfig);
+    EXPECT_TRUE(hashMap.add({"node1"}));
+
+    auto node = hashMap.get("test_key");
+    EXPECT_EQ(node, "node1");
+}
+
+TEST_F(ConsistentHashTest, LongRunningBalancer)
+{
+    ConsistentHashMap hashMap(m_testConfig);
+
+    EXPECT_TRUE(hashMap.add({"node1", "node2"}));
+
+    // Make many requests to trigger balancer activity
+    for (int i = 0; i < 1000; ++i)
+    {
+        hashMap.get("key" + std::to_string(i));
+        if (i % 100 == 0)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+
+    // Add more nodes to trigger rebalancing
+    EXPECT_TRUE(hashMap.add({"node3", "node4"}));
+
+    // Continue making requests
+    for (int i = 1000; i < 2000; ++i)
+    {
+        hashMap.get("key" + std::to_string(i));
+    }
+
+    auto stats = hashMap.getStats();
+    EXPECT_GE(stats.size(), 2);
+}
+
+// Test destructor behavior - ensure balancer thread stops properly
+TEST_F(ConsistentHashTest, DestructorTest)
+{
+    {
+        ConsistentHashMap hashMap(m_testConfig);
+        EXPECT_TRUE(hashMap.add({"node1", "node2"}));
+
+        // Make some requests
+        for (int i = 0; i < 100; ++i)
+        {
+            hashMap.get("key" + std::to_string(i));
+        }
+
+        // hashMap will be destroyed here
+    }
+
+    // If we reach here without hanging, destructor worked correctly
+    SUCCEED();
 }

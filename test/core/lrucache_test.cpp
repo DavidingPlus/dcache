@@ -374,3 +374,64 @@ TEST(LRUCacheTests, ConcurrentSetAndGetAreSerialized)
         }
     }
 }
+
+TEST(LRUCacheTest, TestGet)
+{
+    LRUCache cache{100, nullptr};
+    auto ret = cache.get("1");
+    EXPECT_EQ(ret, std::nullopt);
+
+    cache.set("abcdefg", ByteView{"abcdefg"});
+    ret = cache.get("abcdefg");
+    EXPECT_NE(ret, std::nullopt);
+    EXPECT_EQ(ret.value().toString(), "abcdefg");
+
+    cache.set("11", ByteView{"22"});
+    ret = cache.get("11");
+    EXPECT_NE(ret, std::nullopt);
+    EXPECT_EQ(ret.value().toString(), "22");
+
+    cache.set("123456789", ByteView{"123456789"});
+    ret = cache.get("123456789");
+    EXPECT_NE(ret, std::nullopt);
+    EXPECT_EQ(ret.value().toString(), "123456789");
+}
+
+TEST(LRUCacheTest, TestRemoveOldest)
+{
+    LRUCache cache{40, nullptr};
+    cache.set("12345", ByteView{"abcde"});
+    cache.set("67890", ByteView{"fghij"});
+    cache.set("xxxxx", ByteView{"11111"});
+    cache.set("yyyyy", ByteView{"22222"});
+
+    // 这个时候应该已经满了。
+    // 再加入新的缓存，原来最旧的缓存 {"12345", "abcde"} 会被淘汰。
+    cache.set("zzzzz", ByteView{"33333"});
+
+    auto ret = cache.get("12345");
+    EXPECT_EQ(ret, std::nullopt);
+
+    ret = cache.get("67890");
+    EXPECT_EQ(ret.value().toString(), "fghij");
+}
+
+TEST(LRUCacheTest, TestEvictedFunc)
+{
+    std::vector<Entry> kvs;
+    auto evicted_func = [&](std::string key, const ByteView &value)
+    {
+        std::cout << "test evicted function...\n";
+        kvs.emplace_back(Entry{key, value});
+    };
+    LRUCache cache{10, evicted_func};
+
+    // 容量只有 10，也就是在完成下面四次插入后，key1 和 k2 会被淘汰。
+    cache.set("key1", ByteView{"123456"});
+    cache.set("k2", ByteView{"v2"});
+    cache.set("k3", ByteView{"v3"});
+    cache.set("k4", ByteView{"v4"});
+
+    std::vector<Entry> expected{{"key1", ByteView{"123456"}}, {"k2", ByteView{"v2"}}};
+    EXPECT_EQ(kvs, expected);
+}
