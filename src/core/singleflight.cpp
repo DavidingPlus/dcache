@@ -1,5 +1,7 @@
 #include "singleflight.h"
 
+#include <exception>
+
 
 SingleFlight::Result SingleFlight::Do(const std::string &key, SingleFlight::Func func)
 {
@@ -26,8 +28,24 @@ SingleFlight::Result SingleFlight::Do(const std::string &key, SingleFlight::Func
     lock.unlock();
 
     // 执行用户函数并设置 promise。
-    Result val = func();
-    newCall->m_prom.set_value(val);
+    Result val;
+
+    try
+    {
+        val = func();
+        newCall->m_prom.set_value(val);
+    }
+    catch (...)
+    {
+        // 让所有已加入该 Call 的 follower 从 future.get() 收到同一个异常，而不是永久等待。
+        newCall->m_prom.set_exception(std::current_exception());
+
+        // 即使 func 失败也必须删除进行中记录，后续同 key 请求才能重新执行。
+        lock.lock();
+        m_map.erase(key);
+
+        throw;
+    }
 
     // 删除共享的进行中记录前必须重新获取组锁。unique_lock 在函数返回时自动解锁。
     lock.lock();
