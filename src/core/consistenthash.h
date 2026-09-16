@@ -90,25 +90,28 @@ private:
     // 配置信息。
     HashConfig m_config;
 
-    // 哈希环。
+    // 哈希环。保存所有虚拟节点的哈希值，并在节点增删后保持有序。
+    // m_keys 中出现重复哈希值，可能表示不同虚拟节点发生了哈希碰撞，也可能是同一个节点被重复添加。由于这里仅保存哈希值，无法从 m_keys 本身区分这两种情况。
     std::vector<uint32_t> m_keys;
 
-    // 哈希环到节点的映射。
+    // 哈希环上虚拟结点哈希值到真实结点名称的映射。
+    // TODO 该结构假设一个哈希值只对应一个节点。如果不同虚拟节点发生哈希碰撞，后写入的节点会覆盖先写入的节点，当前设计不能完整处理哈希碰撞。
     std::unordered_map<uint32_t, std::string> m_hashMap;
 
-    // 节点到虚拟节点数量的映射。
+    // 真实节点到其拥有虚拟节点数量的映射。
     std::unordered_map<std::string, int> m_nodeReplicas;
 
-    // 节点负载统计。使用 std::atomic<long long> 保证对 m_nodeCounts 中每个节点计数的原子操作。
+    // 节点负载统计。记录每个真实节点被请求了多少次。
+    // 使用 std::atomic<long long> 保证对 m_nodeCounts 中每个节点计数的原子操作。
     std::unordered_map<std::string, std::atomic<long long>> m_nodeCounts;
 
-    // 总请求数。
+    // 所有节点收到的总请求数。
     std::atomic<long long> m_totalRequests;
 
     // 负载均衡器线程。
     std::thread m_balancerThread;
 
-    // 控制负载均衡器线程停止的标志。
+    // 负载均衡器线程停止的标志。
     std::atomic<bool> m_isBalancerStop;
 };
 

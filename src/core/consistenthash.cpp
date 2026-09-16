@@ -62,6 +62,37 @@ bool ConsistentHashMap::add(const std::vector<std::string> &nodes)
 
 bool ConsistentHashMap::remove(const std::string &node)
 {
+    if (node.empty()) return false;
+
+    // 获取写锁。
+    std::unique_lock lock(m_mtx);
+
+    // 查询结点。
+    auto iterNodeReplicas = m_nodeReplicas.find(node);
+    if (iterNodeReplicas == m_nodeReplicas.end()) return false;
+
+    int replicas = iterNodeReplicas->second;
+
+    // 移除节点的所有虚拟节点。
+    for (int i = 0; i < replicas; ++i)
+    {
+        std::string hashKey = fmt::format("{}-{}", node, std::to_string(i));
+        uint32_t hash = m_config.m_hashFunc(hashKey);
+
+        // 从哈希映射中移除。
+        m_hashMap.erase(hash);
+
+        // 从哈希环中移除哈希值。
+        // std::remove 只移动元素并返回新的逻辑末尾，不会改变 vector 的大小；后续通过 erase 真正删除尾部区间。这样会移除 m_keys 中所有等于 hash 的值，因为重复值可能来自哈希碰撞，也可能来自重复添加节点。如果碰撞来自其他节点，这种按哈希值删除的方式可能误删其他虚拟节点。
+        auto it = std::remove(m_keys.begin(), m_keys.end(), hash);
+        m_keys.erase(it, m_keys.end());
+    }
+
+    m_nodeReplicas.erase(node);
+    m_nodeCounts.erase(node);
+
+
+    return true;
 }
 
 std::string ConsistentHashMap::get(const std::string &key)
@@ -81,6 +112,8 @@ void ConsistentHashMap::addNode(const std::string &node, int replicas)
 
         uint32_t hash = m_config.m_hashFunc(hashKey);
         m_keys.push_back(hash);
+
+        // 目前设计中，m_keys 只记录哈希值。如果不同虚拟节点产生相同哈希值，m_keys 会出现重复值；如果同一个节点被重复添加，也会产生重复值。m_hashMap 以哈希值为唯一键，发生碰撞时后写入的真实节点会覆盖先写入的节点。
         m_hashMap[hash] = node;
     }
 
