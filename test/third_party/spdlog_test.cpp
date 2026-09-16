@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <spdlog/details/os.h>
 #include <spdlog/logger.h>
 #include <spdlog/sinks/ostream_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -12,6 +13,12 @@
 
 namespace
 {
+
+    // spdlog 默认使用平台对应的换行符：Windows 为 "\r\n"，Linux 为 "\n"。测试只关心日志内容，因此统一通过 spdlog 的默认换行符构造期望值。
+    std::string expectedLogLine(const char *content)
+    {
+        return std::string(content) + spdlog::details::os::default_eol;
+    }
 
     struct TestLogger
     {
@@ -36,7 +43,7 @@ TEST(SpdlogTests, UsesLoggerNamePatternAndArguments)
 
     testLogger.logger->info("cache hit: key={}, value={}", "user:1", 42);
 
-    EXPECT_EQ("[unit-test] [info] cache hit: key=user:1, value=42\n", testLogger.output.str());
+    EXPECT_EQ(expectedLogLine("[unit-test] [info] cache hit: key=user:1, value=42"), testLogger.output.str());
 }
 
 TEST(SpdlogTests, LogsEachSeverityWithItsLevelName)
@@ -52,12 +59,7 @@ TEST(SpdlogTests, LogsEachSeverityWithItsLevelName)
     testLogger.logger->critical("critical message");
 
     EXPECT_EQ(
-        "[unit-test] [trace] trace message\n"
-        "[unit-test] [debug] debug message\n"
-        "[unit-test] [info] info message\n"
-        "[unit-test] [warning] warn message\n"
-        "[unit-test] [error] error message\n"
-        "[unit-test] [critical] critical message\n",
+        expectedLogLine("[unit-test] [trace] trace message") + expectedLogLine("[unit-test] [debug] debug message") + expectedLogLine("[unit-test] [info] info message") + expectedLogLine("[unit-test] [warning] warn message") + expectedLogLine("[unit-test] [error] error message") + expectedLogLine("[unit-test] [critical] critical message"),
         testLogger.output.str());
 }
 
@@ -72,7 +74,7 @@ TEST(SpdlogTests, FiltersMessagesBelowConfiguredLoggerLevel)
     testLogger.logger->info("this message is filtered");
     testLogger.logger->warn("remaining items: {}", 2);
 
-    EXPECT_EQ("[unit-test] [warning] remaining items: 2\n", testLogger.output.str());
+    EXPECT_EQ(expectedLogLine("[unit-test] [warning] remaining items: 2"), testLogger.output.str());
 }
 
 TEST(SpdlogTests, FiltersMessagesAtTheSinkLevel)
@@ -84,7 +86,7 @@ TEST(SpdlogTests, FiltersMessagesAtTheSinkLevel)
     testLogger.logger->warn("warning is filtered by the sink");
     testLogger.logger->error("error is written by the sink");
 
-    EXPECT_EQ("[unit-test] [error] error is written by the sink\n", testLogger.output.str());
+    EXPECT_EQ(expectedLogLine("[unit-test] [error] error is written by the sink"), testLogger.output.str());
 }
 
 TEST(SpdlogTests, SupportsTheDefaultLoggerApi)
@@ -96,7 +98,7 @@ TEST(SpdlogTests, SupportsTheDefaultLoggerApi)
     spdlog::info("message through the default logger");
     spdlog::default_logger()->flush();
 
-    EXPECT_EQ("[unit-test] [info] message through the default logger\n", testLogger.output.str());
+    EXPECT_EQ(expectedLogLine("[unit-test] [info] message through the default logger"), testLogger.output.str());
 
     spdlog::set_default_logger(previousLogger);
 }

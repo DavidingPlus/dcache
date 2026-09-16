@@ -13,13 +13,20 @@ namespace kcache
 {
 
     // 默认配置：新节点初始拥有 10 个虚拟节点；动态调整时，数量限制在 [10, 200] 范围内；当最大相对负载偏差超过 25% 时触发重新平衡。
-    const HashConfig kDefaultHashConfig = {
-        .m_defaultReplicas = 10,
-        .m_minReplicas = 10,
-        .m_maxReplicas = 200,
-        .m_hashFunc = crc32IEEE,
-        .m_loadBalanceThreshold = 0.25,
-    };
+    // 项目当前使用 C++17。C++20 的指定初始化语法（例如 .member = value）在 MSVC 的 /std:c++17 模式下不可用，因此这里使用 C++17 兼容的方式：通过匿名 Lambda 创建一个临时配置对象，再逐个设置成员，最后末尾使用 () 立即调用。
+    const HashConfig kDefaultHashConfig = []
+    {
+        HashConfig config{};
+
+        config.m_defaultReplicas = 10;
+        config.m_minReplicas = 10;
+        config.m_maxReplicas = 200;
+        config.m_hashFunc = crc32IEEE;
+        config.m_loadBalanceThreshold = 0.25;
+
+
+        return config;
+    }();
 
 } // namespace kcache
 

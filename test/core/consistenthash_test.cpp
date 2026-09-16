@@ -258,7 +258,7 @@ TEST(ConsistentHashMapTests, SupportsConcurrentAtomicRequestCounting)
     for (int i = 0; i < threadCount; ++i)
     {
         workers.emplace_back(
-            [&hashMap]()
+            [&hashMap, requestsPerKeyPerThread]()
             {
                 for (int j = 0; j < requestsPerKeyPerThread; ++j)
                 {
