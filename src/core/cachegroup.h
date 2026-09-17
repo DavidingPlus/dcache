@@ -1,5 +1,5 @@
-#ifndef _Km_cachem_cacheGROUP_H_
-#define _Km_cachem_cacheGROUP_H_
+#ifndef _KCACHE_CACHE_GROUP_H_
+#define _KCACHE_CACHE_GROUP_H_
 
 #include <functional>
 #include <string>
@@ -29,11 +29,11 @@ enum class SyncFlag
     INVALIDATE, // 缓存失效，只删除本地缓存，不通过 getter 重新加载。
 };
 
+using DataGetter = std::function<ByteViewOptional(const std::string &key)>;
+
 
 class KCacheGroup
 {
-
-    using DataGetter = std::function<ByteViewOptional(const std::string &key)>;
 
 public:
 
@@ -57,12 +57,6 @@ public:
 
     // 处理来自其他节点的失效请求。
     bool invalidateFromPeer(const std::string &key);
-
-
-    static KCacheGroup &MakeCacheGroup(const std::string &name, int64_t bytes, DataGetter getter);
-
-    static KCacheGroup *GetCacheGroup(const std::string &name);
-
 
 private:
 

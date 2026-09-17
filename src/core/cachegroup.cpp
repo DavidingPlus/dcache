@@ -25,14 +25,6 @@ bool KCacheGroup::invalidateFromPeer(const std::string &key)
 {
 }
 
-KCacheGroup &KCacheGroup::MakeCacheGroup(const std::string &name, int64_t bytes, DataGetter getter)
-{
-}
-
-KCacheGroup *KCacheGroup::GetCacheGroup(const std::string &name)
-{
-}
-
 ByteViewOptional KCacheGroup::load(const std::string &key)
 {
 }
