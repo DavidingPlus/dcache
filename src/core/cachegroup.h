@@ -1,5 +1,5 @@
-#ifndef _KCACHE_CACHE_GROUP_H_
-#define _KCACHE_CACHE_GROUP_H_
+#ifndef _Km_cachem_cacheGROUP_H_
+#define _Km_cachem_cacheGROUP_H_
 
 #include <functional>
 #include <string>
@@ -45,7 +45,7 @@ public:
 
     KCacheGroup &operator=(const KCacheGroup &other) = delete;
 
-    KCacheGroup(KCacheGroup &&other);
+    KCacheGroup(KCacheGroup &&other) : m_cache(std::move(other.m_cache)), m_name(std::move(other.m_name)), m_getter(std::move(other.m_getter)) {}
 
     KCacheGroup &operator=(KCacheGroup &&other);
 
@@ -59,6 +59,11 @@ public:
     bool invalidateFromPeer(const std::string &key);
 
 
+    static KCacheGroup &MakeCacheGroup(const std::string &name, int64_t bytes, DataGetter getter);
+
+    static KCacheGroup *GetCacheGroup(const std::string &name);
+
+
 private:
 
     ByteViewOptional load(const std::string &key);
@@ -70,7 +75,7 @@ private:
 
     std::string m_name;
 
-    std::atomic<bool> m_isClose_{false};
+    std::atomic<bool> m_isClose{false};
 
     DataGetter m_getter;
 
