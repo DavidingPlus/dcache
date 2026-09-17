@@ -89,6 +89,25 @@ bool KCacheGroup::deleteByKey(const std::string &key)
 
 bool KCacheGroup::invalidateFromPeer(const std::string &key)
 {
+    if (m_isClose)
+    {
+        spdlog::error("Cache group [{}] is closed!!!", m_name);
+        return false;
+    }
+    if (key.empty())
+    {
+        spdlog::warn("The key [{}] is empty, you can't invalidate it from cache group", key);
+        return false;
+    }
+
+
+    // 来自其他节点的失效请求，删除本地缓存。
+    m_cache->deleteByKey(key);
+
+    spdlog::debug("Invalidated key [{}] from local cache (from peer)", key);
+
+
+    return true;
 }
 
 ByteViewOptional KCacheGroup::load(const std::string &key)
