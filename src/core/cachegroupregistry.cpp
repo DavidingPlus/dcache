@@ -27,6 +27,7 @@ KCacheGroup &KCacheGroupRegistry::MakeCacheGroup(const std::string &name, int64_
         throw std::invalid_argument("cache group getter must not be empty");
     }
 
+
     std::lock_guard lock(m_mtx);
 
     // 使用堆对象保存缓存组，避免注册表扩容或 KCacheGroup 的移动语义影响已返回的对象地址。
