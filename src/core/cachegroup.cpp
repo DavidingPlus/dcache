@@ -44,10 +44,47 @@ ByteViewOptional KCacheGroup::get(const std::string &key)
 
 bool KCacheGroup::set(const std::string &key, ByteView b)
 {
+    if (m_isClose)
+    {
+        spdlog::error("Cache group [{}] is closed!!!", m_name);
+        return false;
+    }
+
+    if (key.empty())
+    {
+        spdlog::warn("The key [{}] is empty, you can't set it into cache group", key);
+        return false;
+    }
+
+
+    m_cache->set(key, b);
+
+    spdlog::debug("key:{} is set value:{}", key, b.toString());
+
+
+    return true;
 }
 
 bool KCacheGroup::deleteByKey(const std::string &key)
 {
+    if (m_isClose)
+    {
+        spdlog::error("Cache group [{}] is closed!!!", m_name);
+        return false;
+    }
+    if (key.empty())
+    {
+        spdlog::warn("The key [{}] is empty, you can't delete it from cache group", key);
+        return false;
+    }
+
+
+    m_cache->deleteByKey(key);
+
+    spdlog::debug("key:{} is deleted", key);
+
+
+    return true;
 }
 
 bool KCacheGroup::invalidateFromPeer(const std::string &key)
