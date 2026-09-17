@@ -2,6 +2,7 @@
 
 #include "cachegroupregistry.h"
 
+#include <atomic>
 #include <future>
 #include <optional>
 #include <stdexcept>
@@ -11,6 +12,13 @@
 
 namespace
 {
+
+    std::string UniqueGroupName(const std::string &prefix)
+    {
+        static std::atomic<unsigned long long> nextId{0};
+        return prefix + "-" + std::to_string(nextId.fetch_add(1, std::memory_order_relaxed));
+    }
+
 
     DataGetter EmptyResultGetter()
     {
@@ -32,21 +40,23 @@ TEST(KCacheGroupRegistryTests, InstanceReturnsTheSameRegistry)
 TEST(KCacheGroupRegistryTests, GetReturnsNullptrForMissingGroup)
 {
     auto &registry = KCacheGroupRegistry::Instance();
+    const auto missingGroupName = UniqueGroupName("registry-missing-group");
 
-    EXPECT_EQ(nullptr, registry.GetCacheGroup("registry-missing-group"));
+    EXPECT_EQ(nullptr, registry.GetCacheGroup(missingGroupName));
     EXPECT_EQ(nullptr, registry.GetCacheGroup(""));
 }
 
 TEST(KCacheGroupRegistryTests, MakeRegistersAndGetReturnsTheSameGroup)
 {
     auto &registry = KCacheGroupRegistry::Instance();
+    const auto groupName = UniqueGroupName("registry-create-and-get-group");
 
     auto &created = registry.MakeCacheGroup(
-        "registry-create-and-get-group",
+        groupName,
         0,
         EmptyResultGetter());
 
-    EXPECT_EQ(&created, registry.GetCacheGroup("registry-create-and-get-group"));
+    EXPECT_EQ(&created, registry.GetCacheGroup(groupName));
 }
 
 TEST(KCacheGroupRegistryTests, RejectsEmptyName)
@@ -61,41 +71,99 @@ TEST(KCacheGroupRegistryTests, RejectsEmptyName)
 TEST(KCacheGroupRegistryTests, RejectsEmptyGetter)
 {
     auto &registry = KCacheGroupRegistry::Instance();
+    const auto groupName = UniqueGroupName("registry-empty-getter-group");
 
     EXPECT_THROW(
-        registry.MakeCacheGroup("registry-empty-getter-group", 0, nullptr),
+        registry.MakeCacheGroup(groupName, 0, nullptr),
         std::invalid_argument);
+    EXPECT_EQ(nullptr, registry.GetCacheGroup(groupName));
+}
+
+
+TEST(KCacheGroupRegistryTests, RegisteredGroupUsesGetterAndCachesValue)
+{
+    auto &registry = KCacheGroupRegistry::Instance();
+    std::atomic<int> callCount{0};
+    const auto groupName = UniqueGroupName("registry-usable-group");
+
+    auto &group = registry.MakeCacheGroup(
+        groupName,
+        0,
+        [&callCount](const std::string &key) -> ByteViewOptional
+        {
+            ++callCount;
+            return ByteView("loaded:" + key);
+        });
+
+    const auto first = group.get("key");
+    const auto second = group.get("key");
+
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ("loaded:key", first->toString());
+    EXPECT_EQ("loaded:key", second->toString());
+    EXPECT_EQ(1, callCount.load());
+}
+
+
+TEST(KCacheGroupRegistryTests, DifferentGroupsKeepSameKeyValuesIndependent)
+{
+    auto &registry = KCacheGroupRegistry::Instance();
+    const auto firstGroupName = UniqueGroupName("registry-isolated-group-a");
+    const auto secondGroupName = UniqueGroupName("registry-isolated-group-b");
+
+    auto &first = registry.MakeCacheGroup(
+        firstGroupName,
+        0,
+        [](const std::string &) -> ByteViewOptional
+        { return ByteView("group-a"); });
+    auto &second = registry.MakeCacheGroup(
+        secondGroupName,
+        0,
+        [](const std::string &) -> ByteViewOptional
+        { return ByteView("group-b"); });
+
+    const auto firstValue = first.get("same-key");
+    const auto secondValue = second.get("same-key");
+
+    ASSERT_TRUE(firstValue.has_value());
+    ASSERT_TRUE(secondValue.has_value());
+    EXPECT_EQ("group-a", firstValue->toString());
+    EXPECT_EQ("group-b", secondValue->toString());
 }
 
 TEST(KCacheGroupRegistryTests, DuplicateNameDoesNotReplaceExistingGroup)
 {
     auto &registry = KCacheGroupRegistry::Instance();
+    const auto groupName = UniqueGroupName("registry-duplicate-group");
 
     auto &created = registry.MakeCacheGroup(
-        "registry-duplicate-group",
+        groupName,
         0,
         EmptyResultGetter());
 
     EXPECT_THROW(
         registry.MakeCacheGroup(
-            "registry-duplicate-group",
+            groupName,
             0,
             EmptyResultGetter()),
         std::invalid_argument);
 
-    EXPECT_EQ(&created, registry.GetCacheGroup("registry-duplicate-group"));
+    EXPECT_EQ(&created, registry.GetCacheGroup(groupName));
 }
 
 TEST(KCacheGroupRegistryTests, DifferentNamesCreateDifferentGroups)
 {
     auto &registry = KCacheGroupRegistry::Instance();
+    const auto firstGroupName = UniqueGroupName("registry-distinct-group-a");
+    const auto secondGroupName = UniqueGroupName("registry-distinct-group-b");
 
     auto &first = registry.MakeCacheGroup(
-        "registry-distinct-group-a",
+        firstGroupName,
         0,
         EmptyResultGetter());
     auto &second = registry.MakeCacheGroup(
-        "registry-distinct-group-b",
+        secondGroupName,
         0,
         EmptyResultGetter());
 
@@ -105,27 +173,29 @@ TEST(KCacheGroupRegistryTests, DifferentNamesCreateDifferentGroups)
 TEST(KCacheGroupRegistryTests, GroupAddressRemainsStableAfterMoreRegistrations)
 {
     auto &registry = KCacheGroupRegistry::Instance();
+    const auto groupName = UniqueGroupName("registry-stable-address-group");
 
     auto &created = registry.MakeCacheGroup(
-        "registry-stable-address-group",
+        groupName,
         0,
         EmptyResultGetter());
 
     for (int i = 0; i < 32; ++i)
     {
         registry.MakeCacheGroup(
-            "registry-stable-address-group-" + std::to_string(i),
+            groupName + "-" + std::to_string(i),
             0,
             EmptyResultGetter());
     }
 
-    EXPECT_EQ(&created, registry.GetCacheGroup("registry-stable-address-group"));
+    EXPECT_EQ(&created, registry.GetCacheGroup(groupName));
 }
 
 TEST(KCacheGroupRegistryTests, ConcurrentRegistrationsAreAllPreserved)
 {
     auto &registry = KCacheGroupRegistry::Instance();
     constexpr int threadCount = 8;
+    const auto groupPrefix = UniqueGroupName("registry-concurrent-group");
 
     std::promise<void> start;
     auto startFuture = start.get_future().share();
@@ -136,10 +206,10 @@ TEST(KCacheGroupRegistryTests, ConcurrentRegistrationsAreAllPreserved)
     {
         registrations.emplace_back(std::async(
             std::launch::async,
-            [&registry, startFuture, i]() mutable -> KCacheGroup *
+            [&registry, startFuture, groupPrefix, i]() mutable -> KCacheGroup *
             {
                 startFuture.wait();
-                auto name = "registry-concurrent-group-" + std::to_string(i);
+                auto name = groupPrefix + "-" + std::to_string(i);
                 return &registry.MakeCacheGroup(name, 0, EmptyResultGetter()); //
             }));
     }
@@ -149,7 +219,7 @@ TEST(KCacheGroupRegistryTests, ConcurrentRegistrationsAreAllPreserved)
     for (int i = 0; i < threadCount; ++i)
     {
         auto *created = registrations[i].get();
-        auto name = "registry-concurrent-group-" + std::to_string(i);
+        auto name = groupPrefix + "-" + std::to_string(i);
 
         ASSERT_NE(nullptr, created);
         EXPECT_EQ(created, registry.GetCacheGroup(name));
@@ -160,7 +230,7 @@ TEST(KCacheGroupRegistryTests, ConcurrentDuplicateRegistrationsOnlyAllowOne)
 {
     auto &registry = KCacheGroupRegistry::Instance();
     constexpr int threadCount = 8;
-    constexpr auto groupName = "registry-concurrent-duplicate-group";
+    const auto groupName = UniqueGroupName("registry-concurrent-duplicate-group");
 
     std::promise<void> start;
     auto startFuture = start.get_future().share();
@@ -211,7 +281,7 @@ TEST(KCacheGroupRegistryTests, ConcurrentDuplicateRegistrationsOnlyAllowOne)
 TEST(KCacheGroupRegistryTests, ConcurrentLookupsReturnTheRegisteredGroup)
 {
     auto &registry = KCacheGroupRegistry::Instance();
-    constexpr auto groupName = "registry-concurrent-lookup-group";
+    const auto groupName = UniqueGroupName("registry-concurrent-lookup-group");
     auto &created = registry.MakeCacheGroup(groupName, 0, EmptyResultGetter());
 
     constexpr int threadCount = 8;
