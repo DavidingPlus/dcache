@@ -12,14 +12,14 @@
 
 struct GroupStatus
 {
-    std::atomic_int64_t m_loads;        // 加载次数。
-    std::atomic_int64_t m_localHits;    // 本地缓存命中次数。
-    std::atomic_int64_t m_localMisses;  // 本地缓存未命中次数。
-    std::atomic_int64_t m_peerHits;     // 从对等节点获取成功次数。
-    std::atomic_int64_t m_peerMisses;   // 从对等节点获取失败次数。
-    std::atomic_int64_t m_loaderHits;   // 从加载器获取成功次数。
-    std::atomic_int64_t m_loaderErrors; // 从加载器获取失败次数。
-    std::atomic_int64_t m_loadDuration; // 加载总耗时（纳秒）。
+    std::atomic_int64_t m_loads{0};        // 加载次数。
+    std::atomic_int64_t m_localHits{0};    // 本地缓存命中次数。
+    std::atomic_int64_t m_localMisses{0};  // 本地缓存未命中次数。
+    std::atomic_int64_t m_peerHits{0};     // 从对等节点获取成功次数。
+    std::atomic_int64_t m_peerMisses{0};   // 从对等节点获取失败次数。
+    std::atomic_int64_t m_loaderHits{0};   // 从加载器获取成功次数。
+    std::atomic_int64_t m_loaderErrors{0}; // 从加载器获取失败次数。
+    std::atomic_int64_t m_loadDuration{0}; // 加载总耗时（纳秒）。
 };
 
 enum class SyncFlag

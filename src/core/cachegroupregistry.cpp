@@ -31,8 +31,7 @@ KCacheGroup &KCacheGroupRegistry::MakeCacheGroup(const std::string &name, int64_
 
     // 使用堆对象保存缓存组，避免注册表扩容或 KCacheGroup 的移动语义影响已返回的对象地址。
     auto [iter, inserted] = m_cacheGroups.emplace(
-        name,
-        std::move(std::make_unique<KCacheGroup>(name, bytes, std::move(getter))));
+        name, std::make_unique<KCacheGroup>(name, bytes, std::move(getter)));
     if (!inserted) throw std::invalid_argument("cache group already exists: " + name);
 
 

@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "globalmacros.h"
 #include "cachegroup.h"
 
 
@@ -14,18 +15,14 @@
 class KCacheGroupRegistry
 {
 
+    CLASS_NONCOPYABLE(KCacheGroupRegistry)
+
 public:
 
     // 获取当前进程唯一的缓存组注册表。
     static KCacheGroupRegistry &Instance();
 
-    KCacheGroupRegistry(const KCacheGroupRegistry &) = delete;
-
-    KCacheGroupRegistry &operator=(const KCacheGroupRegistry &) = delete;
-
-    KCacheGroupRegistry(KCacheGroupRegistry &&) = delete;
-
-    KCacheGroupRegistry &operator=(KCacheGroupRegistry &&) = delete;
+    // 通常，我们不直接使用 KCacheGroup 的构造函数来创建缓存组，而是通过以下两个函数来操作（因为请求缓存节点时是通过 gRPC，那 gRPC Server 就应该接收请求后去创建/使用缓存组）。
 
     // 注册缓存组。同名缓存组不会覆盖，重复注册会抛出异常。
     KCacheGroup &MakeCacheGroup(const std::string &name, int64_t bytes, DataGetter getter);
