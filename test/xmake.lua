@@ -9,6 +9,7 @@ add_requires("gtest")
 
 local gtest_groups = {
     "core",
+    "proto",
     "utils",
     "testrun",
     "third_party"
