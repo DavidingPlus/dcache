@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 {
     const std::string endpoint = argc > 1 ? argv[1] : "http://127.0.0.1:2379";
     const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    const std::string key = "/kcache/snippet/etcd-client-test/" + std::to_string(timestamp);
+    const std::string key = "/dcache/snippet/etcd-client-test/" + std::to_string(timestamp);
     const std::string expected_value = "etcd-cpp-apiv3 works";
 
     std::cout << "connecting to " << endpoint << '\n';

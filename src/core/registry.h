@@ -1,5 +1,5 @@
-#ifndef _KCACHE_REGISTRY_H_
-#define _KCACHE_REGISTRY_H_
+#ifndef _DCACHE_REGISTRY_H_
+#define _DCACHE_REGISTRY_H_
 
 
 #endif

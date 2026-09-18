@@ -64,10 +64,10 @@ local function get_public_header_manifest(target)
 
     -- 特殊处理。
     -- protobuf.cpp 将生成的头文件放在 target:autogendir()/rules/protobuf 下。
-    -- 例如 src/proto/kcache.proto 会生成：
-    --   build/.gens/<target>/<plat>/<arch>/<mode>/rules/protobuf/src/proto/kcache.pb.h
+    -- 例如 src/proto/dcache.proto 会生成：
+    --   build/.gens/<target>/<plat>/<arch>/<mode>/rules/protobuf/src/proto/dcache.pb.h
     -- 发布时去掉构建规则目录和 src/ 前缀，和源码头文件保持一致的安装布局：
-    --   include/kcache/proto/kcache.pb.h
+    --   include/dcache/proto/dcache.pb.h
     local generated_header_root = path.join(target:autogendir(), "rules", "protobuf")
     for _, header in ipairs(os.files(path.join(generated_header_root, "**.pb.h"))) do
         local relative = path.relative(header, generated_header_root):gsub("\\", "/")

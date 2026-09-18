@@ -38,10 +38,10 @@ namespace
 } // namespace
 
 
-TEST(KCacheGroupTests, GetLoadsMissingKeyAndCachesLoadedValue)
+TEST(DCacheGroupTests, GetLoadsMissingKeyAndCachesLoadedValue)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     ExpectValue(group.get("user-1"), "loaded:user-1");
     ExpectValue(group.get("user-1"), "loaded:user-1");
@@ -50,10 +50,10 @@ TEST(KCacheGroupTests, GetLoadsMissingKeyAndCachesLoadedValue)
 }
 
 
-TEST(KCacheGroupTests, GetDoesNotCacheMissingValues)
+TEST(DCacheGroupTests, GetDoesNotCacheMissingValues)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group(
+    DCacheGroup group(
         "users",
         0,
         [&callCount](const std::string &) -> ByteViewOptional
@@ -68,21 +68,21 @@ TEST(KCacheGroupTests, GetDoesNotCacheMissingValues)
 }
 
 
-TEST(KCacheGroupTests, GetRejectsEmptyKeyWithoutCallingGetter)
+TEST(DCacheGroupTests, GetRejectsEmptyKeyWithoutCallingGetter)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     EXPECT_FALSE(group.get("").has_value());
     EXPECT_EQ(0, callCount.load());
 }
 
 
-TEST(KCacheGroupTests, GetPreservesEmptyAndBinaryValues)
+TEST(DCacheGroupTests, GetPreservesEmptyAndBinaryValues)
 {
     std::atomic<int> callCount{0};
     const std::string binary{std::string{'a', '\0', 'b'}};
-    KCacheGroup group(
+    DCacheGroup group(
         "values",
         0,
         [&callCount, binary](const std::string &key) -> ByteViewOptional
@@ -106,10 +106,10 @@ TEST(KCacheGroupTests, GetPreservesEmptyAndBinaryValues)
 }
 
 
-TEST(KCacheGroupTests, SetStoresValueAndOverridesGetter)
+TEST(DCacheGroupTests, SetStoresValueAndOverridesGetter)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     ASSERT_TRUE(group.set("user-1", ByteView("from-set")));
 
@@ -118,10 +118,10 @@ TEST(KCacheGroupTests, SetStoresValueAndOverridesGetter)
 }
 
 
-TEST(KCacheGroupTests, SetRejectsEmptyKey)
+TEST(DCacheGroupTests, SetRejectsEmptyKey)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     EXPECT_FALSE(group.set("", ByteView("value")));
     EXPECT_FALSE(group.get("").has_value());
@@ -129,10 +129,10 @@ TEST(KCacheGroupTests, SetRejectsEmptyKey)
 }
 
 
-TEST(KCacheGroupTests, DeleteByKeyRemovesLocalValue)
+TEST(DCacheGroupTests, DeleteByKeyRemovesLocalValue)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     ASSERT_TRUE(group.set("user-1", ByteView("cached")));
     ASSERT_TRUE(group.deleteByKey("user-1"));
@@ -142,30 +142,30 @@ TEST(KCacheGroupTests, DeleteByKeyRemovesLocalValue)
 }
 
 
-TEST(KCacheGroupTests, DeleteByKeyAcceptsMissingKey)
+TEST(DCacheGroupTests, DeleteByKeyAcceptsMissingKey)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     EXPECT_TRUE(group.deleteByKey("missing"));
     EXPECT_EQ(0, callCount.load());
 }
 
 
-TEST(KCacheGroupTests, DeleteByKeyRejectsEmptyKey)
+TEST(DCacheGroupTests, DeleteByKeyRejectsEmptyKey)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     EXPECT_FALSE(group.deleteByKey(""));
     EXPECT_EQ(0, callCount.load());
 }
 
 
-TEST(KCacheGroupTests, InvalidateFromPeerRemovesLocalValueWithoutLoading)
+TEST(DCacheGroupTests, InvalidateFromPeerRemovesLocalValueWithoutLoading)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     ASSERT_TRUE(group.set("user-1", ByteView("cached")));
     ASSERT_TRUE(group.invalidateFromPeer("user-1"));
@@ -176,30 +176,30 @@ TEST(KCacheGroupTests, InvalidateFromPeerRemovesLocalValueWithoutLoading)
 }
 
 
-TEST(KCacheGroupTests, InvalidateFromPeerAcceptsMissingKey)
+TEST(DCacheGroupTests, InvalidateFromPeerAcceptsMissingKey)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     EXPECT_TRUE(group.invalidateFromPeer("missing"));
     EXPECT_EQ(0, callCount.load());
 }
 
 
-TEST(KCacheGroupTests, InvalidateFromPeerRejectsEmptyKey)
+TEST(DCacheGroupTests, InvalidateFromPeerRejectsEmptyKey)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 0, MakeGetter(callCount));
+    DCacheGroup group("users", 0, MakeGetter(callCount));
 
     EXPECT_FALSE(group.invalidateFromPeer(""));
     EXPECT_EQ(0, callCount.load());
 }
 
 
-TEST(KCacheGroupTests, GetterExceptionIsPropagatedAndKeyCanBeRetried)
+TEST(DCacheGroupTests, GetterExceptionIsPropagatedAndKeyCanBeRetried)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group(
+    DCacheGroup group(
         "users",
         0,
         [&callCount](const std::string &) -> ByteViewOptional
@@ -215,7 +215,7 @@ TEST(KCacheGroupTests, GetterExceptionIsPropagatedAndKeyCanBeRetried)
 }
 
 
-TEST(KCacheGroupTests, ConcurrentGetsShareOneGetterCall)
+TEST(DCacheGroupTests, ConcurrentGetsShareOneGetterCall)
 {
     std::atomic<int> callCount{0};
     std::promise<void> getterStarted;
@@ -223,7 +223,7 @@ TEST(KCacheGroupTests, ConcurrentGetsShareOneGetterCall)
     std::promise<void> allowGetterToFinish;
     const auto allowGetterToFinishFuture = allowGetterToFinish.get_future().share();
 
-    KCacheGroup group(
+    DCacheGroup group(
         "users",
         0,
         [&callCount, &getterStarted, allowGetterToFinishFuture](const std::string &) -> ByteViewOptional
@@ -269,10 +269,10 @@ TEST(KCacheGroupTests, ConcurrentGetsShareOneGetterCall)
 }
 
 
-TEST(KCacheGroupTests, CapacityIsForwardedToLocalCache)
+TEST(DCacheGroupTests, CapacityIsForwardedToLocalCache)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup group("users", 6, MakeGetter(callCount));
+    DCacheGroup group("users", 6, MakeGetter(callCount));
 
     ASSERT_TRUE(group.set("a", ByteView("1")));
     ASSERT_TRUE(group.set("b", ByteView("2")));
@@ -285,13 +285,13 @@ TEST(KCacheGroupTests, CapacityIsForwardedToLocalCache)
 }
 
 
-TEST(KCacheGroupTests, MoveConstructorTransfersCacheAndGetter)
+TEST(DCacheGroupTests, MoveConstructorTransfersCacheAndGetter)
 {
     std::atomic<int> callCount{0};
-    KCacheGroup source("users", 0, MakeGetter(callCount));
+    DCacheGroup source("users", 0, MakeGetter(callCount));
     ASSERT_TRUE(source.set("cached", ByteView("cached-value")));
 
-    KCacheGroup moved(std::move(source));
+    DCacheGroup moved(std::move(source));
 
     ExpectValue(moved.get("cached"), "cached-value");
     ExpectValue(moved.get("loaded"), "loaded:loaded");
@@ -299,17 +299,17 @@ TEST(KCacheGroupTests, MoveConstructorTransfersCacheAndGetter)
 }
 
 
-TEST(KCacheGroupTests, MoveAssignmentReplacesDestinationState)
+TEST(DCacheGroupTests, MoveAssignmentReplacesDestinationState)
 {
     std::atomic<int> sourceCalls{0};
     std::atomic<int> destinationCalls{0};
-    KCacheGroup source("source", 0, MakeGetter(sourceCalls, "source:"));
-    KCacheGroup destination("destination", 0, MakeGetter(destinationCalls, "destination:"));
+    DCacheGroup source("source", 0, MakeGetter(sourceCalls, "source:"));
+    DCacheGroup destination("destination", 0, MakeGetter(destinationCalls, "destination:"));
 
     ASSERT_TRUE(source.set("source-key", ByteView("source-value")));
     ASSERT_TRUE(destination.set("destination-key", ByteView("destination-value")));
 
-    KCacheGroup &assigned = (destination = std::move(source));
+    DCacheGroup &assigned = (destination = std::move(source));
 
     EXPECT_EQ(&destination, &assigned);
     ExpectValue(destination.get("source-key"), "source-value");

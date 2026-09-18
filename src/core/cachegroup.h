@@ -1,5 +1,5 @@
-#ifndef _KCACHE_CACHE_GROUP_H_
-#define _KCACHE_CACHE_GROUP_H_
+#ifndef _DCACHE_CACHE_GROUP_H_
+#define _DCACHE_CACHE_GROUP_H_
 
 #include <functional>
 #include <string>
@@ -32,22 +32,22 @@ enum class SyncFlag
 using DataGetter = std::function<ByteViewOptional(const std::string &key)>;
 
 
-class KCacheGroup
+class DCacheGroup
 {
 
 public:
 
-    KCacheGroup() = default;
+    DCacheGroup() = default;
 
-    KCacheGroup(std::string name, int64_t bytes, DataGetter getter) : m_cache(std::make_unique<LRUCache>(bytes)), m_name(name), m_getter(getter) {}
+    DCacheGroup(std::string name, int64_t bytes, DataGetter getter) : m_cache(std::make_unique<LRUCache>(bytes)), m_name(name), m_getter(getter) {}
 
-    KCacheGroup(const KCacheGroup &) = delete;
+    DCacheGroup(const DCacheGroup &) = delete;
 
-    KCacheGroup &operator=(const KCacheGroup &other) = delete;
+    DCacheGroup &operator=(const DCacheGroup &other) = delete;
 
-    KCacheGroup(KCacheGroup &&other) : m_cache(std::move(other.m_cache)), m_name(std::move(other.m_name)), m_getter(std::move(other.m_getter)) {}
+    DCacheGroup(DCacheGroup &&other) : m_cache(std::move(other.m_cache)), m_name(std::move(other.m_name)), m_getter(std::move(other.m_getter)) {}
 
-    KCacheGroup &operator=(KCacheGroup &&other);
+    DCacheGroup &operator=(DCacheGroup &&other);
 
     // 获取指定 key 的缓存值。先查询当前缓存组的本地 LRU 缓存，未命中时通过 load 加载数据并回填本地缓存。
     ByteViewOptional get(const std::string &key);

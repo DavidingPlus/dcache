@@ -1,7 +1,7 @@
 #include "crc32.h"
 
 
-namespace kcache
+namespace dcache
 {
 
     // CRC32 IEEE 查找表，兼容 Go 的 crc32.ChecksumIEEE。
@@ -272,4 +272,4 @@ namespace kcache
         return crc ^ 0xFFFFFFFF;
     }
 
-} // namespace kcache
+} // namespace dcache

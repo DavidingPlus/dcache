@@ -1,5 +1,5 @@
-#ifndef _KCACHE_SINGLEFLIGHT_H_
-#define _KCACHE_SINGLEFLIGHT_H_
+#ifndef _DCACHE_SINGLEFLIGHT_H_
+#define _DCACHE_SINGLEFLIGHT_H_
 
 #include <future>
 #include <optional>

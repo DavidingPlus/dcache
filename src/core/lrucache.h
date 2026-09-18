@@ -1,5 +1,5 @@
-#ifndef _KCACHE_LRUCACHE_H_
-#define _KCACHE_LRUCACHE_H_
+#ifndef _DCACHE_LRUCACHE_H_
+#define _DCACHE_LRUCACHE_H_
 
 #include <vector>
 #include <string>

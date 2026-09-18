@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "kcache.pb.h"
+#include "dcache.pb.h"
 
 #include <google/protobuf/descriptor.h>
 
@@ -57,16 +57,16 @@ namespace
 } // namespace
 
 
-TEST(KCacheProtoTests, FileDescriptorDescribesTheExpectedSchema)
+TEST(DCacheProtoTests, FileDescriptorDescribesTheExpectedSchema)
 {
-    const auto *request = kcache::pb::Request::descriptor();
+    const auto *request = dcache::pb::Request::descriptor();
 
     ASSERT_NE(nullptr, request);
     ASSERT_NE(nullptr, request->file());
 
     const auto *file = request->file();
-    EXPECT_EQ("kcache.proto", file->name());
-    EXPECT_EQ("kcache.pb", file->package());
+    EXPECT_EQ("dcache.proto", file->name());
+    EXPECT_EQ("dcache.pb", file->package());
     EXPECT_EQ(5, file->message_type_count());
     EXPECT_EQ(1, file->service_count());
 
@@ -127,13 +127,13 @@ TEST(KCacheProtoTests, FileDescriptorDescribesTheExpectedSchema)
         google::protobuf::FieldDescriptor::TYPE_BOOL);
 }
 
-TEST(KCacheProtoTests, ServiceDescriptorDescribesAllRpcMethods)
+TEST(DCacheProtoTests, ServiceDescriptorDescribesAllRpcMethods)
 {
-    const auto *file = kcache::pb::Request::descriptor()->file();
-    const auto *service = file->FindServiceByName("KCache");
+    const auto *file = dcache::pb::Request::descriptor()->file();
+    const auto *service = file->FindServiceByName("DCache");
 
     ASSERT_NE(nullptr, service);
-    EXPECT_EQ("kcache.pb.KCache", service->full_name());
+    EXPECT_EQ("dcache.pb.DCache", service->full_name());
     ASSERT_EQ(4, service->method_count());
 
     struct ExpectedMethod
@@ -143,10 +143,10 @@ TEST(KCacheProtoTests, ServiceDescriptorDescribesAllRpcMethods)
     };
 
     const ExpectedMethod expected_methods[] = {
-        {"Get", "kcache.pb.GetResponse"},
-        {"Set", "kcache.pb.SetResponse"},
-        {"Delete", "kcache.pb.DeleteResponse"},
-        {"Invalidate", "kcache.pb.InvalidateResponse"},
+        {"Get", "dcache.pb.GetResponse"},
+        {"Set", "dcache.pb.SetResponse"},
+        {"Delete", "dcache.pb.DeleteResponse"},
+        {"Invalidate", "dcache.pb.InvalidateResponse"},
     };
 
     for (const auto &expected : expected_methods)
@@ -154,14 +154,14 @@ TEST(KCacheProtoTests, ServiceDescriptorDescribesAllRpcMethods)
         const auto *method = service->FindMethodByName(expected.name);
 
         ASSERT_NE(nullptr, method);
-        EXPECT_EQ("kcache.pb.Request", method->input_type()->full_name());
+        EXPECT_EQ("dcache.pb.Request", method->input_type()->full_name());
         EXPECT_EQ(expected.output_type, method->output_type()->full_name());
     }
 }
 
-TEST(KCacheProtoTests, RequestHasProto3DefaultValues)
+TEST(DCacheProtoTests, RequestHasProto3DefaultValues)
 {
-    kcache::pb::Request request;
+    dcache::pb::Request request;
 
     EXPECT_TRUE(request.IsInitialized());
     EXPECT_TRUE(request.group().empty());
@@ -171,9 +171,9 @@ TEST(KCacheProtoTests, RequestHasProto3DefaultValues)
     EXPECT_TRUE(request.SerializeAsString().empty());
 }
 
-TEST(KCacheProtoTests, RequestRoundTripsTextAndBinaryFields)
+TEST(DCacheProtoTests, RequestRoundTripsTextAndBinaryFields)
 {
-    kcache::pb::Request request;
+    dcache::pb::Request request;
     request.set_group("users");
     request.set_key("user:42");
     request.set_value(BinaryValue());
@@ -181,7 +181,7 @@ TEST(KCacheProtoTests, RequestRoundTripsTextAndBinaryFields)
     const auto serialized = request.SerializeAsString();
     ASSERT_FALSE(serialized.empty());
 
-    kcache::pb::Request decoded;
+    dcache::pb::Request decoded;
     ASSERT_TRUE(decoded.ParseFromString(serialized));
 
     EXPECT_EQ("users", decoded.group());
@@ -190,9 +190,9 @@ TEST(KCacheProtoTests, RequestRoundTripsTextAndBinaryFields)
     EXPECT_EQ(serialized, decoded.SerializeAsString());
 }
 
-TEST(KCacheProtoTests, RequestUsesTheExpectedWireFieldNumbers)
+TEST(DCacheProtoTests, RequestUsesTheExpectedWireFieldNumbers)
 {
-    kcache::pb::Request request;
+    dcache::pb::Request request;
     request.set_group("users");
     request.set_key("k");
     request.set_value(std::string({'\0', '\x01', static_cast<char>(0xff)}));
@@ -211,9 +211,9 @@ TEST(KCacheProtoTests, RequestUsesTheExpectedWireFieldNumbers)
     EXPECT_EQ(expected, request.SerializeAsString());
 }
 
-TEST(KCacheProtoTests, RequestClearRestoresTheDefaultState)
+TEST(DCacheProtoTests, RequestClearRestoresTheDefaultState)
 {
-    kcache::pb::Request request;
+    dcache::pb::Request request;
     request.set_group("users");
     request.set_key("user:42");
     request.set_value(BinaryValue());
@@ -227,17 +227,17 @@ TEST(KCacheProtoTests, RequestClearRestoresTheDefaultState)
     EXPECT_TRUE(request.SerializeAsString().empty());
 }
 
-TEST(KCacheProtoTests, RequestCanBeCopiedAndSwapped)
+TEST(DCacheProtoTests, RequestCanBeCopiedAndSwapped)
 {
-    kcache::pb::Request original;
+    dcache::pb::Request original;
     original.set_group("users");
     original.set_key("user:42");
     original.set_value(BinaryValue());
 
-    kcache::pb::Request copied(original);
+    dcache::pb::Request copied(original);
     EXPECT_EQ(original.SerializeAsString(), copied.SerializeAsString());
 
-    kcache::pb::Request swapped;
+    dcache::pb::Request swapped;
     swapped.set_key("other");
     swapped.Swap(&copied);
 
@@ -246,9 +246,9 @@ TEST(KCacheProtoTests, RequestCanBeCopiedAndSwapped)
     EXPECT_EQ(BinaryValue(), swapped.value());
 }
 
-TEST(KCacheProtoTests, RequestRejectsMalformedWireData)
+TEST(DCacheProtoTests, RequestRejectsMalformedWireData)
 {
-    kcache::pb::Request request;
+    dcache::pb::Request request;
 
     const std::string truncated_length_delimited{
         static_cast<char>(0x0a),
@@ -260,15 +260,15 @@ TEST(KCacheProtoTests, RequestRejectsMalformedWireData)
     EXPECT_FALSE(request.ParseFromString(invalid_zero_tag));
 }
 
-TEST(KCacheProtoTests, RequestPreservesUnknownFields)
+TEST(DCacheProtoTests, RequestPreservesUnknownFields)
 {
     // Field 4, encoded as a varint with value 42, is not currently defined by
-    // kcache.proto. It simulates a field added by a newer protocol version.
+    // dcache.proto. It simulates a field added by a newer protocol version.
     const std::string wire_with_unknown_field{
         static_cast<char>(0x20),
         static_cast<char>(0x2a)};
 
-    kcache::pb::Request request;
+    dcache::pb::Request request;
     ASSERT_TRUE(request.ParseFromString(wire_with_unknown_field));
 
     const auto &unknown_fields = request.unknown_fields();
@@ -279,36 +279,36 @@ TEST(KCacheProtoTests, RequestPreservesUnknownFields)
         unknown_fields.field(0).type());
     EXPECT_EQ(42u, unknown_fields.field(0).varint());
 
-    kcache::pb::Request round_tripped;
+    dcache::pb::Request round_tripped;
     ASSERT_TRUE(round_tripped.ParseFromString(request.SerializeAsString()));
     ASSERT_EQ(1, round_tripped.unknown_fields().field_count());
     EXPECT_EQ(4, round_tripped.unknown_fields().field(0).number());
     EXPECT_EQ(42u, round_tripped.unknown_fields().field(0).varint());
 }
 
-TEST(KCacheProtoTests, GetResponseRoundTripsBinaryPayload)
+TEST(DCacheProtoTests, GetResponseRoundTripsBinaryPayload)
 {
-    kcache::pb::GetResponse response;
+    dcache::pb::GetResponse response;
     response.set_value(BinaryValue());
 
-    kcache::pb::GetResponse decoded;
+    dcache::pb::GetResponse decoded;
     ASSERT_TRUE(decoded.ParseFromString(response.SerializeAsString()));
 
     EXPECT_EQ(BinaryValue(), decoded.value());
     EXPECT_EQ(response.ByteSizeLong(), decoded.ByteSizeLong());
 }
 
-TEST(KCacheProtoTests, SetResponseRoundTripsBooleanValue)
+TEST(DCacheProtoTests, SetResponseRoundTripsBooleanValue)
 {
-    ExpectBooleanResponseRoundTrip<kcache::pb::SetResponse>();
+    ExpectBooleanResponseRoundTrip<dcache::pb::SetResponse>();
 }
 
-TEST(KCacheProtoTests, DeleteResponseRoundTripsBooleanValue)
+TEST(DCacheProtoTests, DeleteResponseRoundTripsBooleanValue)
 {
-    ExpectBooleanResponseRoundTrip<kcache::pb::DeleteResponse>();
+    ExpectBooleanResponseRoundTrip<dcache::pb::DeleteResponse>();
 }
 
-TEST(KCacheProtoTests, InvalidateResponseRoundTripsBooleanValue)
+TEST(DCacheProtoTests, InvalidateResponseRoundTripsBooleanValue)
 {
-    ExpectBooleanResponseRoundTrip<kcache::pb::InvalidateResponse>();
+    ExpectBooleanResponseRoundTrip<dcache::pb::InvalidateResponse>();
 }

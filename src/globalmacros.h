@@ -1,5 +1,5 @@
-#ifndef _KCACHE_GLOBALMACROS_H_
-#define _KCACHE_GLOBALMACROS_H_
+#ifndef _DCACHE_GLOBALMACROS_H_
+#define _DCACHE_GLOBALMACROS_H_
 
 
 #define CLASS_NONCOPYABLE(ClassName)                       \

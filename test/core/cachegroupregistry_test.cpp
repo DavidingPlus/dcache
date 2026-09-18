@@ -29,26 +29,26 @@ namespace
 } // namespace
 
 
-TEST(KCacheGroupRegistryTests, InstanceReturnsTheSameRegistry)
+TEST(DCacheGroupRegistryTests, InstanceReturnsTheSameRegistry)
 {
-    auto &first = KCacheGroupRegistry::Instance();
-    auto &second = KCacheGroupRegistry::Instance();
+    auto &first = DCacheGroupRegistry::Instance();
+    auto &second = DCacheGroupRegistry::Instance();
 
     EXPECT_EQ(&first, &second);
 }
 
-TEST(KCacheGroupRegistryTests, GetReturnsNullptrForMissingGroup)
+TEST(DCacheGroupRegistryTests, GetReturnsNullptrForMissingGroup)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto missingGroupName = UniqueGroupName("registry-missing-group");
 
     EXPECT_EQ(nullptr, registry.GetCacheGroup(missingGroupName));
     EXPECT_EQ(nullptr, registry.GetCacheGroup(""));
 }
 
-TEST(KCacheGroupRegistryTests, MakeRegistersAndGetReturnsTheSameGroup)
+TEST(DCacheGroupRegistryTests, MakeRegistersAndGetReturnsTheSameGroup)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto groupName = UniqueGroupName("registry-create-and-get-group");
 
     auto &created = registry.MakeCacheGroup(
@@ -59,18 +59,18 @@ TEST(KCacheGroupRegistryTests, MakeRegistersAndGetReturnsTheSameGroup)
     EXPECT_EQ(&created, registry.GetCacheGroup(groupName));
 }
 
-TEST(KCacheGroupRegistryTests, RejectsEmptyName)
+TEST(DCacheGroupRegistryTests, RejectsEmptyName)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
 
     EXPECT_THROW(
         registry.MakeCacheGroup("", 0, EmptyResultGetter()),
         std::invalid_argument);
 }
 
-TEST(KCacheGroupRegistryTests, RejectsEmptyGetter)
+TEST(DCacheGroupRegistryTests, RejectsEmptyGetter)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto groupName = UniqueGroupName("registry-empty-getter-group");
 
     EXPECT_THROW(
@@ -80,9 +80,9 @@ TEST(KCacheGroupRegistryTests, RejectsEmptyGetter)
 }
 
 
-TEST(KCacheGroupRegistryTests, RegisteredGroupUsesGetterAndCachesValue)
+TEST(DCacheGroupRegistryTests, RegisteredGroupUsesGetterAndCachesValue)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     std::atomic<int> callCount{0};
     const auto groupName = UniqueGroupName("registry-usable-group");
 
@@ -106,9 +106,9 @@ TEST(KCacheGroupRegistryTests, RegisteredGroupUsesGetterAndCachesValue)
 }
 
 
-TEST(KCacheGroupRegistryTests, DifferentGroupsKeepSameKeyValuesIndependent)
+TEST(DCacheGroupRegistryTests, DifferentGroupsKeepSameKeyValuesIndependent)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto firstGroupName = UniqueGroupName("registry-isolated-group-a");
     const auto secondGroupName = UniqueGroupName("registry-isolated-group-b");
 
@@ -132,9 +132,9 @@ TEST(KCacheGroupRegistryTests, DifferentGroupsKeepSameKeyValuesIndependent)
     EXPECT_EQ("group-b", secondValue->toString());
 }
 
-TEST(KCacheGroupRegistryTests, DuplicateNameDoesNotReplaceExistingGroup)
+TEST(DCacheGroupRegistryTests, DuplicateNameDoesNotReplaceExistingGroup)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto groupName = UniqueGroupName("registry-duplicate-group");
 
     auto &created = registry.MakeCacheGroup(
@@ -152,9 +152,9 @@ TEST(KCacheGroupRegistryTests, DuplicateNameDoesNotReplaceExistingGroup)
     EXPECT_EQ(&created, registry.GetCacheGroup(groupName));
 }
 
-TEST(KCacheGroupRegistryTests, DifferentNamesCreateDifferentGroups)
+TEST(DCacheGroupRegistryTests, DifferentNamesCreateDifferentGroups)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto firstGroupName = UniqueGroupName("registry-distinct-group-a");
     const auto secondGroupName = UniqueGroupName("registry-distinct-group-b");
 
@@ -170,9 +170,9 @@ TEST(KCacheGroupRegistryTests, DifferentNamesCreateDifferentGroups)
     EXPECT_NE(&first, &second);
 }
 
-TEST(KCacheGroupRegistryTests, GroupAddressRemainsStableAfterMoreRegistrations)
+TEST(DCacheGroupRegistryTests, GroupAddressRemainsStableAfterMoreRegistrations)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto groupName = UniqueGroupName("registry-stable-address-group");
 
     auto &created = registry.MakeCacheGroup(
@@ -191,22 +191,22 @@ TEST(KCacheGroupRegistryTests, GroupAddressRemainsStableAfterMoreRegistrations)
     EXPECT_EQ(&created, registry.GetCacheGroup(groupName));
 }
 
-TEST(KCacheGroupRegistryTests, ConcurrentRegistrationsAreAllPreserved)
+TEST(DCacheGroupRegistryTests, ConcurrentRegistrationsAreAllPreserved)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     constexpr int threadCount = 8;
     const auto groupPrefix = UniqueGroupName("registry-concurrent-group");
 
     std::promise<void> start;
     auto startFuture = start.get_future().share();
-    std::vector<std::future<KCacheGroup *>> registrations;
+    std::vector<std::future<DCacheGroup *>> registrations;
     registrations.reserve(threadCount);
 
     for (int i = 0; i < threadCount; ++i)
     {
         registrations.emplace_back(std::async(
             std::launch::async,
-            [&registry, startFuture, groupPrefix, i]() mutable -> KCacheGroup *
+            [&registry, startFuture, groupPrefix, i]() mutable -> DCacheGroup *
             {
                 startFuture.wait();
                 auto name = groupPrefix + "-" + std::to_string(i);
@@ -226,22 +226,22 @@ TEST(KCacheGroupRegistryTests, ConcurrentRegistrationsAreAllPreserved)
     }
 }
 
-TEST(KCacheGroupRegistryTests, ConcurrentDuplicateRegistrationsOnlyAllowOne)
+TEST(DCacheGroupRegistryTests, ConcurrentDuplicateRegistrationsOnlyAllowOne)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     constexpr int threadCount = 8;
     const auto groupName = UniqueGroupName("registry-concurrent-duplicate-group");
 
     std::promise<void> start;
     auto startFuture = start.get_future().share();
-    std::vector<std::future<KCacheGroup *>> registrations;
+    std::vector<std::future<DCacheGroup *>> registrations;
     registrations.reserve(threadCount);
 
     for (int i = 0; i < threadCount; ++i)
     {
         registrations.emplace_back(std::async(
             std::launch::async,
-            [&registry, startFuture, groupName]() mutable -> KCacheGroup *
+            [&registry, startFuture, groupName]() mutable -> DCacheGroup *
             {
                 startFuture.wait();
 
@@ -261,7 +261,7 @@ TEST(KCacheGroupRegistryTests, ConcurrentDuplicateRegistrationsOnlyAllowOne)
 
     start.set_value();
 
-    KCacheGroup *created = nullptr;
+    DCacheGroup *created = nullptr;
     int successfulRegistrations = 0;
     for (auto &registration : registrations)
     {
@@ -278,23 +278,23 @@ TEST(KCacheGroupRegistryTests, ConcurrentDuplicateRegistrationsOnlyAllowOne)
     EXPECT_EQ(created, registry.GetCacheGroup(groupName));
 }
 
-TEST(KCacheGroupRegistryTests, ConcurrentLookupsReturnTheRegisteredGroup)
+TEST(DCacheGroupRegistryTests, ConcurrentLookupsReturnTheRegisteredGroup)
 {
-    auto &registry = KCacheGroupRegistry::Instance();
+    auto &registry = DCacheGroupRegistry::Instance();
     const auto groupName = UniqueGroupName("registry-concurrent-lookup-group");
     auto &created = registry.MakeCacheGroup(groupName, 0, EmptyResultGetter());
 
     constexpr int threadCount = 8;
     std::promise<void> start;
     auto startFuture = start.get_future().share();
-    std::vector<std::future<KCacheGroup *>> lookups;
+    std::vector<std::future<DCacheGroup *>> lookups;
     lookups.reserve(threadCount);
 
     for (int i = 0; i < threadCount; ++i)
     {
         lookups.emplace_back(std::async(
             std::launch::async,
-            [&registry, startFuture, groupName]() mutable -> KCacheGroup *
+            [&registry, startFuture, groupName]() mutable -> DCacheGroup *
             {
                 startFuture.wait();
                 return registry.GetCacheGroup(groupName); //

@@ -6,14 +6,14 @@
 #include <spdlog/spdlog.h>
 
 
-KCacheGroupRegistry &KCacheGroupRegistry::Instance()
+DCacheGroupRegistry &DCacheGroupRegistry::Instance()
 {
     // 函数内静态对象在 C++11 及之后保证线程安全地初始化。
-    static KCacheGroupRegistry registry;
+    static DCacheGroupRegistry registry;
     return registry;
 }
 
-KCacheGroup &KCacheGroupRegistry::MakeCacheGroup(const std::string &name, int64_t bytes, DataGetter getter)
+DCacheGroup &DCacheGroupRegistry::MakeCacheGroup(const std::string &name, int64_t bytes, DataGetter getter)
 {
     if (name.empty())
     {
@@ -30,16 +30,16 @@ KCacheGroup &KCacheGroupRegistry::MakeCacheGroup(const std::string &name, int64_
 
     std::lock_guard lock(m_mtx);
 
-    // 使用堆对象保存缓存组，避免注册表扩容或 KCacheGroup 的移动语义影响已返回的对象地址。
+    // 使用堆对象保存缓存组，避免注册表扩容或 DCacheGroup 的移动语义影响已返回的对象地址。
     auto [iter, inserted] = m_cacheGroups.emplace(
-        name, std::make_unique<KCacheGroup>(name, bytes, std::move(getter)));
+        name, std::make_unique<DCacheGroup>(name, bytes, std::move(getter)));
     if (!inserted) throw std::invalid_argument("cache group already exists: " + name);
 
 
     return *iter->second;
 }
 
-KCacheGroup *KCacheGroupRegistry::GetCacheGroup(const std::string &name)
+DCacheGroup *DCacheGroupRegistry::GetCacheGroup(const std::string &name)
 {
     std::lock_guard lock(m_mtx);
 

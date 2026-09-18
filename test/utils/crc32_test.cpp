@@ -9,7 +9,7 @@
 namespace
 {
 
-    using kcache::crc32IEEE;
+    using dcache::crc32IEEE;
 
 } // namespace
 

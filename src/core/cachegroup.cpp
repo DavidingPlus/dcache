@@ -3,7 +3,7 @@
 #include <spdlog/spdlog.h>
 
 
-KCacheGroup &KCacheGroup::operator=(KCacheGroup &&other)
+DCacheGroup &DCacheGroup::operator=(DCacheGroup &&other)
 {
     m_cache = std::move(other.m_cache);
     m_name = std::move(other.m_name);
@@ -11,7 +11,7 @@ KCacheGroup &KCacheGroup::operator=(KCacheGroup &&other)
     return *this;
 }
 
-ByteViewOptional KCacheGroup::get(const std::string &key)
+ByteViewOptional DCacheGroup::get(const std::string &key)
 {
     if (m_isClose)
     {
@@ -42,7 +42,7 @@ ByteViewOptional KCacheGroup::get(const std::string &key)
     }
 }
 
-bool KCacheGroup::set(const std::string &key, ByteView b)
+bool DCacheGroup::set(const std::string &key, ByteView b)
 {
     if (m_isClose)
     {
@@ -65,7 +65,7 @@ bool KCacheGroup::set(const std::string &key, ByteView b)
     return true;
 }
 
-bool KCacheGroup::deleteByKey(const std::string &key)
+bool DCacheGroup::deleteByKey(const std::string &key)
 {
     if (m_isClose)
     {
@@ -87,7 +87,7 @@ bool KCacheGroup::deleteByKey(const std::string &key)
     return true;
 }
 
-bool KCacheGroup::invalidateFromPeer(const std::string &key)
+bool DCacheGroup::invalidateFromPeer(const std::string &key)
 {
     if (m_isClose)
     {
@@ -110,7 +110,7 @@ bool KCacheGroup::invalidateFromPeer(const std::string &key)
     return true;
 }
 
-ByteViewOptional KCacheGroup::load(const std::string &key)
+ByteViewOptional DCacheGroup::load(const std::string &key)
 {
     auto res = m_loader.Do(key, [&]() -> ByteViewOptional
                            {

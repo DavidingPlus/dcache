@@ -20,7 +20,7 @@ namespace
     // - 哈希值 350 超过环尾，回绕后命中 node-a。
     HashConfig makeTestHashConfig()
     {
-        HashConfig config = kcache::kDefaultHashConfig;
+        HashConfig config = dcache::kDefaultHashConfig;
         config.m_defaultReplicas = 1;
         config.m_minReplicas = 1;
         config.m_maxReplicas = 1;
@@ -34,7 +34,7 @@ namespace
             if (key == "key-after-last") return 350;
 
             // 未显式指定的 key 使用正常哈希函数，避免测试配置对其他 key 产生特殊语义。
-            return kcache::crc32IEEE(key);
+            return dcache::crc32IEEE(key);
         };
 
         return config;
@@ -51,7 +51,7 @@ namespace
             if (key == "key-low") return 50u;
             if (key == "key-high") return 0xE0000000u;
 
-            return kcache::crc32IEEE(key);
+            return dcache::crc32IEEE(key);
         };
 
         return config;
@@ -62,7 +62,7 @@ namespace
 
 TEST(HashConfigTests, ProvidesExpectedDefaultValues)
 {
-    const auto &config = kcache::kDefaultHashConfig;
+    const auto &config = dcache::kDefaultHashConfig;
 
     EXPECT_EQ(10, config.m_defaultReplicas);
     EXPECT_EQ(10, config.m_minReplicas);
@@ -72,7 +72,7 @@ TEST(HashConfigTests, ProvidesExpectedDefaultValues)
 
 TEST(HashConfigTests, DefaultReplicaCountIsWithinConfiguredBounds)
 {
-    const auto &config = kcache::kDefaultHashConfig;
+    const auto &config = dcache::kDefaultHashConfig;
 
     EXPECT_LE(config.m_minReplicas, config.m_defaultReplicas);
     EXPECT_LE(config.m_defaultReplicas, config.m_maxReplicas);
@@ -80,11 +80,11 @@ TEST(HashConfigTests, DefaultReplicaCountIsWithinConfiguredBounds)
 
 TEST(HashConfigTests, UsesCrc32IEEEAsDefaultHashFunction)
 {
-    const auto &config = kcache::kDefaultHashConfig;
+    const auto &config = dcache::kDefaultHashConfig;
     const std::string key = "node-a-0";
 
     ASSERT_TRUE(config.m_hashFunc);
-    EXPECT_EQ(kcache::crc32IEEE(key), config.m_hashFunc(key));
+    EXPECT_EQ(dcache::crc32IEEE(key), config.m_hashFunc(key));
 }
 
 TEST(ConsistentHashMapTests, ReturnsEmptyWhenHashRingHasNoNodes)

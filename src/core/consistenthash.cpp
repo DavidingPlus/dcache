@@ -9,7 +9,7 @@
 #include <spdlog/spdlog.h>
 
 
-namespace kcache
+namespace dcache
 {
 
     // 默认配置：新节点初始拥有 10 个虚拟节点；动态调整时，数量限制在 [10, 200] 范围内；当最大相对负载偏差超过 25% 时触发重新平衡。
@@ -28,7 +28,7 @@ namespace kcache
         return config;
     }();
 
-} // namespace kcache
+} // namespace dcache
 
 
 ConsistentHashMap::ConsistentHashMap(HashConfig cfg)

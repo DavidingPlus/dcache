@@ -21,7 +21,7 @@ target("tests")
 
     set_kind("binary")
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/test")
-    add_deps("kcache")
+    add_deps("dcache")
     add_packages("fmt", "gtest", "spdlog")
 
     before_build(function ()

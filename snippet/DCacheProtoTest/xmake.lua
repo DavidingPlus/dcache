@@ -1,5 +1,5 @@
-target("KCacheProtoTest")
+target("DCacheProtoTest")
     set_kind("binary")
     add_files("main.cpp")
-    add_deps("kcache")
+    add_deps("dcache")
 target_end()

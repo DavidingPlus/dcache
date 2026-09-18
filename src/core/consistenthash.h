@@ -1,5 +1,5 @@
-#ifndef _KCACHE_CONSISTENT_HASH_H_
-#define _KCACHE_CONSISTENT_HASH_H_
+#ifndef _DCACHE_CONSISTENT_HASH_H_
+#define _DCACHE_CONSISTENT_HASH_H_
 
 #include <cstdint>
 #include <functional>
@@ -31,7 +31,7 @@ struct HashConfig
 };
 
 
-namespace kcache
+namespace dcache
 {
 
     // 默认一致性哈希配置。
@@ -41,7 +41,7 @@ namespace kcache
     // 3. 只在 .cpp 内部使用：直接在 .cpp 中 static 定义。
     extern const HashConfig kDefaultHashConfig;
 
-} // namespace kcache
+} // namespace dcache
 
 
 // 一致性哈希路由表。
@@ -53,7 +53,7 @@ class ConsistentHashMap
 public:
 
     // New 创建一致性哈希实例。
-    explicit ConsistentHashMap(HashConfig cfg = kcache::kDefaultHashConfig);
+    explicit ConsistentHashMap(HashConfig cfg = dcache::kDefaultHashConfig);
 
     // 析构函数，确保负载均衡器线程正确停止。
     ~ConsistentHashMap();
