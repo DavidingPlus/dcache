@@ -1,28 +1,94 @@
 # gRPC 与 etcd 基础
 
-本文记录分布式缓存中 gRPC、`.proto`、`protoc`、gRPC 服务基类和 etcd 的基本语义。
+本文记录分布式缓存中 gRPC、Protocol Buffers、`.proto`、`protoc`、gRPC 服务基类和 etcd 的基本语义。
 
 ## 1. 先看整体分工
 
-分布式缓存通常同时需要解决三个问题：
+分布式缓存通常同时需要解决以下几类问题：
 
 ```text
-有哪些缓存节点？       → etcd 服务注册与发现
-某个 key 应该去哪？     → 一致性哈希
-如何调用目标节点？      → gRPC
+有哪些缓存节点？                 → etcd 服务注册与发现
+某个 key 应该去哪？               → 一致性哈希
+请求和响应的数据如何定义、编码？   → Protocol Buffers
+如何调用目标节点？                 → gRPC
+网络数据如何传输？                 → HTTP/2（标准 gRPC 通常使用）
 ```
 
-它们的职责不同，etcd 管理“节点在哪里、是否在线”，gRPC 负责“向节点执行缓存操作”，一致性哈希负责“选择哪个节点”。
+可以把一次远程缓存调用抽象成下面的过程：
+
+```text
+客户端业务对象
+    │
+    │ Protobuf 序列化
+    ▼
+二进制消息
+    │
+    │ gRPC 调用与 HTTP/2 传输
+    ▼
+目标节点的 gRPC Server
+    │
+    │ Protobuf 反序列化
+    ▼
+服务端业务对象
+```
+
+它们的职责不同，不能混为一谈：
 
 | 组件 | 主要职责 | 是否保存缓存值 |
 | --- | --- | --- |
 | etcd | 保存节点地址、服务注册信息和配置，并通知变化 | 否 |
 | 一致性哈希 | 将 key 映射到负责的缓存节点 | 否 |
-| gRPC | 在客户端和缓存节点之间传递缓存操作请求 | 否 |
+| `.proto` | 描述消息字段和 RPC 服务契约 | 否 |
+| Protobuf | 将消息对象编码为紧凑的二进制数据，并负责解码 | 否 |
+| gRPC | 定义和执行远程过程调用，传输请求和响应 | 否 |
+| HTTP/2 | 为标准 gRPC 提供底层网络传输 | 否 |
 | gRPC Server | 接收 RPC，并调用本节点的缓存逻辑 | 间接使用 |
 | CacheGroup / LRU | 执行本地缓存读写和淘汰 | 是 |
 
-因此，gRPC 不是缓存数据结构，也不负责节点发现或一致性哈希。它是一种 RPC 通信机制。
+### 1.1 gRPC 和 Protobuf 的关系
+
+gRPC 和 Protobuf 经常一起出现，但它们解决的是不同问题：
+
+```text
+Protobuf：消息长什么样？如何序列化和反序列化？
+gRPC：    如何调用远程方法？如何把请求发到服务端？
+```
+
+同一份 `.proto` 文件通常同时包含两类定义：
+
+```proto
+message Request {
+    string key = 1;
+}
+
+service Cache {
+    rpc Get(Request) returns (GetResponse);
+}
+```
+
+其中：
+
+- `message` 定义由 Protobuf 处理，生成 `*.pb.h`、`*.pb.cc`，提供消息类、字段访问、序列化和反序列化；
+- `service` 和 `rpc` 定义由 gRPC 代码生成插件处理，通常生成 `*.grpc.pb.h`、`*.grpc.pb.cc`，提供客户端 `Stub` 和服务端 `Service` 基类；
+- gRPC 默认使用 Protobuf 作为请求和响应的编码格式，但 Protobuf 本身可以脱离 gRPC 使用；
+- Protobuf 不负责建立连接、监听端口、节点发现或远程调用；
+- gRPC 也不负责一致性哈希、缓存淘汰或 etcd 服务发现。
+
+因此，“gRPC 是节点之间通信的一种协议”这个说法可以帮助理解，但更准确地说，gRPC 是一套 RPC 框架和通信机制；Protobuf 是它常用的接口描述与消息序列化方案。
+
+### 1.2 `protoc` 和 gRPC 插件的分工
+
+```text
+.proto
+  │
+  ├─ protoc                  → Protobuf 消息类
+  │                            *.pb.h / *.pb.cc
+  │
+  └─ protoc + grpc_cpp_plugin → gRPC 调用代码
+                               *.grpc.pb.h / *.grpc.pb.cc
+```
+
+只使用 Protobuf 时，可以直接把消息序列化后写入文件、消息队列或自定义 TCP 连接，不需要 gRPC。使用 gRPC 时，则通常同时使用 Protobuf 消息定义和 gRPC 生成的客户端/服务端代码。
 
 ## 2. gRPC Server 在缓存系统中的语义
 
