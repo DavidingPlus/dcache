@@ -22,6 +22,7 @@ add_includedirs("$(builddir)/config/")
 
 add_requires("fmt")
 add_requires("spdlog")
+add_requires("protobuf-cpp")
 
 
 option("with_gtest")
@@ -69,6 +70,11 @@ target("kcache")
 
     add_packages("fmt", {public = true})
     add_packages("spdlog", {public = true})
+    add_packages("protobuf-cpp", {public = true})
+
+    -- 自动将 src/proto/**.proto 编译为 protobuf C++ 源文件和头文件。proto_public 让生成头文件目录可以被依赖该库的目标继承。
+    add_rules("protobuf.cpp")
+    add_files("src/proto/**.proto", {proto_public = true})
 
     if build_shared and is_current_win32() then
         add_rules("utils.symbols.export_all")
