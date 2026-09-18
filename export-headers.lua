@@ -62,6 +62,43 @@ local function get_public_header_manifest(target)
         end
     end
 
+    -- 特殊处理。
+    -- protobuf.cpp 将生成的头文件放在 target:autogendir()/rules/protobuf 下。
+    -- 例如 src/proto/kcache.proto 会生成：
+    --   build/.gens/<target>/<plat>/<arch>/<mode>/rules/protobuf/src/proto/kcache.pb.h
+    -- 发布时去掉构建规则目录和 src/ 前缀，和源码头文件保持一致的安装布局：
+    --   include/kcache/proto/kcache.pb.h
+    local generated_header_root = path.join(target:autogendir(), "rules", "protobuf")
+    for _, header in ipairs(os.files(path.join(generated_header_root, "**.pb.h"))) do
+        local relative = path.relative(header, generated_header_root):gsub("\\", "/")
+        if relative:sub(1, 4) == "src/" then
+            relative = relative:sub(5)
+        end
+
+        local source = normalize_path(header)
+        local install = (public_header_prefix .. "/" .. relative):gsub("\\", "/")
+        local entry = {
+            relative = relative,
+            source = source,
+            install = install,
+        }
+
+        if manifest.by_source[source] then
+            raise("duplicate public header source path: %s", source)
+        end
+
+        manifest.by_source[source] = entry
+        table.insert(manifest.entries, entry)
+
+        local basename = path.filename(header)
+        local existing = manifest.by_basename[basename]
+        if existing == nil then
+            manifest.by_basename[basename] = entry
+        elseif existing ~= false then
+            manifest.by_basename[basename] = false
+        end
+    end
+
     public_header_manifest = manifest
     return manifest
 end
